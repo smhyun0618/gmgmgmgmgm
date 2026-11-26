@@ -1,7 +1,6 @@
 
 import streamlit as st
 import streamlit.components.v1 as components
-import random
 import json
 
 st.set_page_config(
@@ -12,1164 +11,972 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-.stApp {
-    background: #080b12;
-    color: white;
-}
-h1 {
-    color: #42ff9e;
-    text-align: center;
-    font-family: monospace;
-}
+    .stApp {
+        background: #090d16;
+        color: white;
+    }
+    header, footer {
+        visibility: hidden;
+    }
+    .block-container {
+        padding-top: 1rem;
+        max-width: 1100px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("⚔️ RETRO STRIKE")
-st.caption("RETRO FPS MISSION | WASD MOVE | SPACE SHOOT")
+st.caption("SURVIVE THE MISSION. ELIMINATE ALL HOSTILES.")
 
-# 적 종류
-ENEMY_TYPES = [
-    {
-        "type": "alien",
-        "name": "ALIEN",
-        "color": "#39ff14",
-        "hp": 1,
-        "speed": 0.65,
-        "size": 0.8
-    },
-    {
-        "type": "robot",
-        "name": "ROBOT",
-        "color": "#ff3333",
-        "hp": 3,
-        "speed": 0.35,
-        "size": 1.0
-    },
-    {
-        "type": "ghost",
-        "name": "GHOST",
-        "color": "#bb66ff",
-        "hp": 1,
-        "speed": 0.9,
-        "size": 0.7
-    }
-]
-
-# 시작 위치에서 멀리 떨어진 적 생성 위치
-ENEMY_POSITIONS = [
-    (8.5, 1.5),
-    (9.5, 3.5),
-    (8.5, 6.5),
-    (5.5, 8.5),
-    (9.5, 8.5),
-    (1.5, 6.5),
-    (5.5, 3.5),
-    (2.5, 8.5),
-    (10.5, 5.5)
-]
-
-# Python 리스트와 반복문 활용
-def create_enemies(stage):
-    enemies = []
-    positions = ENEMY_POSITIONS.copy()
-    random.shuffle(positions)
-
-    count = min(4 + stage * 2, len(positions))
-
-    for i in range(count):
-        enemy_type = random.choice(ENEMY_TYPES)
-        x, y = positions[i]
-
-        enemies.append({
-            "type": enemy_type["type"],
-            "name": enemy_type["name"],
-            "color": enemy_type["color"],
-            "hp": enemy_type["hp"],
-            "maxHp": enemy_type["hp"],
-            "speed": enemy_type["speed"],
-            "size": enemy_type["size"],
-            "x": x,
-            "y": y
-        })
-
-    return enemies
-
-
-initial_enemies = create_enemies(1)
-enemy_json = json.dumps(initial_enemies)
-
-html = r"""
+game_html = r"""
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-
 <style>
-* {
-    box-sizing: border-box;
-}
-
+* { box-sizing: border-box; }
 body {
     margin: 0;
-    background: #05070c;
+    background: #080b12;
     color: white;
     font-family: monospace;
     overflow: hidden;
 }
-
+#game {
+    width: 100%;
+    max-width: 900px;
+    margin: auto;
+    position: relative;
+}
 #hud {
     display: flex;
-    justify-content: space-around;
-    flex-wrap: wrap;
+    justify-content: space-between;
     gap: 8px;
-    padding: 12px;
-    background: #101722;
-    color: #42ff9e;
-    font-size: 16px;
+    padding: 10px;
+    background: #111827;
+    border: 1px solid #39465d;
+    font-size: 14px;
+    flex-wrap: wrap;
 }
-
-#gameBox {
-    position: relative;
-    width: 100%;
-}
-
-canvas {
+.hud-item { color: #dce8ff; }
+#canvas {
     display: block;
     width: 100%;
-    height: 450px;
+    height: auto;
     background: black;
-    image-rendering: pixelated;
+    border: 2px solid #39465d;
     outline: none;
+    cursor: crosshair;
 }
-
-#help {
-    text-align: center;
-    padding: 10px;
-    color: #42ff9e;
-    background: #101722;
-    font-size: 13px;
-}
-
 #overlay {
     position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.9);
+    top: 42px;
+    left: 0;
+    width: 100%;
+    height: 450px;
+    background: rgba(3, 7, 15, .88);
     display: flex;
-    justify-content: center;
-    align-items: center;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    z-index: 10;
-    padding: 20px;
+    z-index: 5;
 }
-
 #overlay h1 {
-    color: #42ff9e;
-    font-size: 36px;
+    color: #ff4242;
+    font-size: 38px;
+    margin: 5px;
+    text-shadow: 0 0 15px red;
 }
-
-#overlay p {
-    line-height: 2;
-    color: white;
-}
-
+#overlay p { color: #cbd5e1; }
 #overlay button {
-    background: #42ff9e;
-    border: none;
-    padding: 15px 30px;
-    font-size: 18px;
-    font-weight: bold;
+    margin-top: 15px;
+    padding: 13px 30px;
+    background: #b91c1c;
+    color: white;
+    border: 1px solid #ff7777;
+    font-family: monospace;
+    font-size: 17px;
     cursor: pointer;
 }
-
-#overlay button:hover {
-    background: white;
+#overlay button:hover { background: #ef4444; }
+#help {
+    padding: 9px;
+    color: #9ca3af;
+    font-size: 12px;
+    text-align: center;
+}
+#warning {
+    color: #ff5555;
+    font-weight: bold;
+    min-height: 18px;
+    text-align: center;
 }
 </style>
 </head>
 
 <body>
+<div id="game">
+    <div id="hud">
+        <span class="hud-item" id="hp">HP: 100</span>
+        <span class="hud-item" id="ammo">AMMO: 12/12</span>
+        <span class="hud-item" id="score">SCORE: 0</span>
+        <span class="hud-item" id="stage">STAGE: 1</span>
+        <span class="hud-item" id="time">TIME: 90</span>
+        <span class="hud-item" id="hostiles">HOSTILES: 0</span>
+    </div>
 
-<div id="hud">
-    <span id="hp">HP: 100</span>
-    <span id="ammo">AMMO: 20</span>
-    <span id="score">SCORE: 0</span>
-    <span id="stage">STAGE: 1</span>
-    <span id="enemyCount">ENEMIES: 0</span>
-</div>
+    <canvas id="canvas" width="800" height="450" tabindex="0"></canvas>
 
-<div id="gameBox">
-
-    <canvas id="game"
-        width="800"
-        height="450"
-        tabindex="0">
-    </canvas>
+    <div id="warning"></div>
 
     <div id="overlay">
         <h1>RETRO STRIKE</h1>
-        <p>
-            MISSION START<br>
-            적을 모두 처치하고 다음 구역으로 이동하라.<br><br>
-            WASD : 이동<br>
-            ← → : 시야 회전<br>
-            SPACE : 발사<br>
-            R : 재장전
-        </p>
-        <button id="startButton">START MISSION</button>
+        <p>ELIMINATE ALL HOSTILES</p>
+        <p>WASD: MOVE | ← →: TURN | SPACE: FIRE | R: RELOAD</p>
+        <button id="mainButton" onclick="startGame()">START MISSION</button>
     </div>
 
-</div>
-
-<div id="help">
-    W/S 이동 · A/D 좌우 이동 · ←/→ 회전 · SPACE 발사 · R 재장전
+    <div id="help">
+        RUSHER: FAST CHASER · SNIPER: LONG RANGE · TANK: HEAVY ARMOR · DRONE: HEALER
+    </div>
 </div>
 
 <script>
-
-const canvas = document.getElementById("game");
+const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 const W = canvas.width;
 const H = canvas.height;
-
-const initialEnemyData = __ENEMIES__;
-
-// 맵
-const map = [
-    "############",
-    "#..........#",
-    "#..##......#",
-    "#..........#",
-    "#.....#....#",
-    "#.....#....#",
-    "#..........#",
-    "#..##......#",
-    "#..........#",
-    "############"
-];
-
 const FOV = Math.PI / 3;
 const RAYS = 400;
-const MAX_DEPTH = 12;
+const MAX_AMMO = 12;
 
-let player = null;
+const MAP = [
+    "111111111111",
+    "100000000001",
+    "101110010101",
+    "100010000001",
+    "100010110001",
+    "100000000001",
+    "101101010101",
+    "100000000001",
+    "100000000001",
+    "111111111111"
+];
+
+const SPAWNS = [
+    [9.5, 1.5],
+    [10.5, 3.5],
+    [8.5, 5.5],
+    [5.5, 8.5],
+    [9.5, 8.5],
+    [1.5, 7.5],
+    [6.5, 3.5],
+    [2.5, 8.5],
+    [10.5, 7.5]
+];
+
+const TYPES = {
+    rusher: {
+        name: "RUSHER",
+        hp: 45,
+        speed: 1.45,
+        damage: 9,
+        color: "#ff4545",
+        symbol: "👹"
+    },
+    sniper: {
+        name: "SNIPER",
+        hp: 35,
+        speed: 0.55,
+        damage: 17,
+        color: "#ffb347",
+        symbol: "🤖"
+    },
+    tank: {
+        name: "TANK",
+        hp: 150,
+        speed: 0.38,
+        damage: 20,
+        color: "#9b75ff",
+        symbol: "🛡️"
+    },
+    drone: {
+        name: "DRONE",
+        hp: 40,
+        speed: 0.65,
+        damage: 0,
+        color: "#4de6ff",
+        symbol: "🛸"
+    }
+};
+
+let player = {
+    x: 1.5,
+    y: 1.5,
+    angle: 0,
+    hp: 100,
+    ammo: MAX_AMMO
+};
+
 let enemies = [];
-let keys = {};
-
-let score = 0;
 let stage = 1;
-let hp = 100;
-let ammo = 20;
-const maxAmmo = 20;
-
+let score = 0;
+let timeLeft = 90;
 let gameRunning = false;
-let gameOver = false;
 let stageCleared = false;
-
-let muzzleFlash = 0;
-let bulletFrames = 0;
-let hitMarker = 0;
-let damageFlash = 0;
-let shootCooldown = 0;
-let reloadTime = 0;
-
+let gameOver = false;
 let lastTime = 0;
 let animationId = null;
+
+let keys = {};
 let zBuffer = [];
+let effects = [];
+let muzzleFlash = 0;
+let hitFlash = 0;
+let reloadTime = 0;
+let shootCooldown = 0;
+let damageFlash = 0;
+let warningText = "";
+let warningTimer = 0;
 
-// 게임 시작
-function startGame() {
-
-    if (animationId !== null) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-    }
-
-    player = {
-        x: 1.5,
-        y: 1.5,
-        angle: 0
-    };
-
-    enemies = initialEnemyData.map(e => ({
-        ...e,
-        lastAttack: 0
-    }));
-
-    score = 0;
-    stage = 1;
-    hp = 100;
-    ammo = maxAmmo;
-
-    gameOver = false;
-    stageCleared = false;
-    gameRunning = true;
-
-    muzzleFlash = 0;
-    bulletFrames = 0;
-    hitMarker = 0;
-    damageFlash = 0;
-    shootCooldown = 0;
-    reloadTime = 0;
-
-    lastTime = 0;
-    keys = {};
-
-    document.getElementById("overlay").style.display = "none";
-
-    canvas.focus();
-
-    updateHUD();
-
-    animationId = requestAnimationFrame(loop);
-}
-
-document.getElementById("startButton").addEventListener(
-    "click",
-    startGame
-);
-
-// 벽 확인
 function isWall(x, y) {
-
     const mx = Math.floor(x);
     const my = Math.floor(y);
 
     if (
-        my < 0 ||
-        my >= map.length ||
-        mx < 0 ||
-        mx >= map[0].length
-    ) {
-        return true;
-    }
+        my < 0 || my >= MAP.length ||
+        mx < 0 || mx >= MAP[0].length
+    ) return true;
 
-    return map[my][mx] === "#";
+    return MAP[my][mx] === "1";
 }
 
-// 이동 가능 여부
 function canMove(x, y) {
-
     const r = 0.18;
 
-    return (
-        !isWall(x-r, y-r) &&
-        !isWall(x+r, y-r) &&
-        !isWall(x-r, y+r) &&
-        !isWall(x+r, y+r)
-    );
+    return !isWall(x-r, y-r) &&
+           !isWall(x+r, y-r) &&
+           !isWall(x-r, y+r) &&
+           !isWall(x+r, y+r);
 }
 
-// 각도 정리
 function normalizeAngle(a) {
-
-    while (a > Math.PI) {
-        a -= Math.PI * 2;
-    }
-
-    while (a < -Math.PI) {
-        a += Math.PI * 2;
-    }
-
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
     return a;
 }
 
-// 광선으로 벽 거리 확인
-function castRay(angle) {
-
-    for (let d = 0.02; d < MAX_DEPTH; d += 0.025) {
-
-        const x = player.x + Math.cos(angle) * d;
-        const y = player.y + Math.sin(angle) * d;
-
-        if (isWall(x, y)) {
-            return d;
-        }
-    }
-
-    return MAX_DEPTH;
+function distance(x1, y1, x2, y2) {
+    return Math.hypot(x2-x1, y2-y1);
 }
 
-// 플레이어 이동
-function movePlayer(dt) {
+function hasLineOfSight(x1, y1, x2, y2) {
+    const d = distance(x1, y1, x2, y2);
+    const steps = Math.ceil(d * 12);
 
-    const moveSpeed = 2.5 * dt;
-    const turnSpeed = 2.0 * dt;
-
-    if (keys["arrowleft"]) {
-        player.angle -= turnSpeed;
+    for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        const x = x1 + (x2-x1)*t;
+        const y = y1 + (y2-y1)*t;
+        if (isWall(x, y)) return false;
     }
-
-    if (keys["arrowright"]) {
-        player.angle += turnSpeed;
-    }
-
-    const forward =
-        (keys["w"] ? 1 : 0) -
-        (keys["s"] ? 1 : 0);
-
-    const side =
-        (keys["d"] ? 1 : 0) -
-        (keys["a"] ? 1 : 0);
-
-    const dx = (
-        Math.cos(player.angle) * forward -
-        Math.sin(player.angle) * side
-    ) * moveSpeed;
-
-    const dy = (
-        Math.sin(player.angle) * forward +
-        Math.cos(player.angle) * side
-    ) * moveSpeed;
-
-    if (canMove(player.x + dx, player.y)) {
-        player.x += dx;
-    }
-
-    if (canMove(player.x, player.y + dy)) {
-        player.y += dy;
-    }
+    return true;
 }
 
-// 배경과 벽 그리기
-function drawWorld() {
-
-    const sky = ctx.createLinearGradient(0, 0, 0, H/2);
-
-    sky.addColorStop(0, "#080d20");
-    sky.addColorStop(1, "#28334a");
-
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H/2);
-
-    const floor = ctx.createLinearGradient(0, H/2, 0, H);
-
-    floor.addColorStop(0, "#24232b");
-    floor.addColorStop(1, "#090909");
-
-    ctx.fillStyle = floor;
-    ctx.fillRect(0, H/2, W, H/2);
-
-    zBuffer = [];
-
-    for (let i = 0; i < RAYS; i++) {
-
-        const angle =
-            player.angle - FOV/2 + FOV * i/RAYS;
-
-        const dist = castRay(angle);
-
-        const corrected =
-            dist * Math.cos(angle - player.angle);
-
-        zBuffer[i] = corrected;
-
-        const wallHeight =
-            Math.min(H, H / Math.max(0.1, corrected));
-
-        const y = (H-wallHeight)/2;
-
-        const shade = Math.max(30, 210-corrected*20);
-
-        ctx.fillStyle =
-            `rgb(${shade*0.55},${shade*0.65},${shade})`;
-
-        ctx.fillRect(
-            i * W/RAYS,
-            y,
-            W/RAYS + 1,
-            wallHeight
-        );
-
-        if (i % 8 === 0) {
-            ctx.fillStyle = "rgba(0,0,0,0.15)";
-            ctx.fillRect(
-                i * W/RAYS,
-                y,
-                1,
-                wallHeight
-            );
-        }
-    }
-}
-
-// 적의 생김새
-function drawEnemyShape(enemy, x, y, size) {
-
-    ctx.save();
-
-    ctx.translate(x, y);
-    ctx.scale(size/55, size/55);
-
-    if (enemy.type === "alien") {
-
-        // 초록 외계인
-        ctx.fillStyle = "#39ff14";
-
-        ctx.beginPath();
-        ctx.ellipse(0, -12, 22, 28, 0, 0, Math.PI*2);
-        ctx.fill();
-
-        ctx.fillStyle = "#07120a";
-        ctx.fillRect(-14, -20, 10, 13);
-        ctx.fillRect(5, -20, 10, 13);
-
-        ctx.fillStyle = "white";
-        ctx.fillRect(-12, -18, 5, 8);
-        ctx.fillRect(7, -18, 5, 8);
-
-        ctx.fillStyle = "#0a2c0c";
-        ctx.fillRect(-12, 10, 24, 8);
-        ctx.fillRect(-20, 20, 12, 20);
-        ctx.fillRect(8, 20, 12, 20);
-
-    } else if (enemy.type === "robot") {
-
-        // 빨간 로봇
-        ctx.fillStyle = "#555b65";
-        ctx.fillRect(-22, -35, 44, 60);
-
-        ctx.fillStyle = "#ff3333";
-        ctx.fillRect(-19, -38, 38, 24);
-
-        ctx.fillRect(-29, -5, 12, 35);
-        ctx.fillRect(17, -5, 12, 35);
-
-        ctx.fillStyle = "#fff3a0";
-        ctx.fillRect(-13, -31, 9, 8);
-        ctx.fillRect(4, -31, 9, 8);
-
-        ctx.fillStyle = "#171717";
-        ctx.fillRect(-12, 3, 24, 8);
-        ctx.fillRect(-17, 27, 13, 17);
-        ctx.fillRect(4, 27, 13, 17);
-
-    } else {
-
-        // 보라색 유령
-        ctx.fillStyle = "#bb66ff";
-
-        ctx.beginPath();
-        ctx.arc(0, -10, 23, Math.PI, 0);
-        ctx.lineTo(23, 25);
-        ctx.lineTo(10, 15);
-        ctx.lineTo(0, 25);
-        ctx.lineTo(-10, 15);
-        ctx.lineTo(-23, 25);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = "white";
-        ctx.fillRect(-13, -15, 8, 11);
-        ctx.fillRect(5, -15, 8, 11);
-
-        ctx.fillStyle = "#222";
-        ctx.fillRect(-10, -12, 4, 6);
-        ctx.fillRect(7, -12, 4, 6);
-    }
-
-    ctx.restore();
-}
-
-// 적 화면에 표시
-function drawEnemies() {
-
-    const visible = [];
-
-    for (const enemy of enemies) {
-
-        const dx = enemy.x-player.x;
-        const dy = enemy.y-player.y;
-
-        const dist = Math.hypot(dx, dy);
-
-        const angle = normalizeAngle(
-            Math.atan2(dy, dx)-player.angle
-        );
-
-        if (Math.abs(angle) < FOV/2 + 0.2) {
-            visible.push({
-                enemy: enemy,
-                dist: dist,
-                angle: angle
-            });
-        }
-    }
-
-    visible.sort((a,b) => b.dist-a.dist);
-
-    for (const item of visible) {
-
-        const enemy = item.enemy;
-        const dist = item.dist;
-        const angle = item.angle;
-
-        const screenX = (0.5+angle/FOV)*W;
-
-        const size = Math.min(
-            220,
-            H/dist*enemy.size
-        );
-
-        const screenY = H/2+size*0.15;
-
-        const rayIndex = Math.floor(screenX/W*RAYS);
-
-        if (rayIndex < 0 || rayIndex >= RAYS) continue;
-        if (dist > zBuffer[rayIndex]+0.1) continue;
-
-        drawEnemyShape(
-            enemy,
-            screenX,
-            screenY,
-            size
-        );
-
-        // 적 체력 표시
-        const barWidth = size*0.7;
-        const barX = screenX-barWidth/2;
-        const barY = screenY-size*0.75;
-
-        ctx.fillStyle = "#222";
-        ctx.fillRect(barX, barY, barWidth, 5);
-
-        ctx.fillStyle = "#ff4444";
-
-        ctx.fillRect(
-            barX,
-            barY,
-            barWidth*enemy.hp/enemy.maxHp,
-            5
-        );
-    }
-}
-
-// 총 그리기
-function drawGun() {
-
-    const cx = W/2;
-    const recoil = muzzleFlash > 0 ? 8 : 0;
-
-    ctx.fillStyle = "#151a22";
-    ctx.fillRect(cx-45, H-105+recoil, 90, 105);
-
-    ctx.fillStyle = "#424b5c";
-    ctx.fillRect(cx-28, H-135+recoil, 56, 70);
-
-    ctx.fillStyle = "#778397";
-    ctx.fillRect(cx-14, H-150+recoil, 28, 25);
-
-    ctx.fillStyle = "#0b0e14";
-    ctx.fillRect(cx-9, H-151+recoil, 18, 16);
-
-    // 총구 섬광
-    if (muzzleFlash > 0) {
-
-        ctx.fillStyle =
-            muzzleFlash % 2 === 0 ? "#fff36a" : "#ff7b19";
-
-        ctx.beginPath();
-        ctx.moveTo(cx, H-160+recoil);
-        ctx.lineTo(cx-35, H-205);
-        ctx.lineTo(cx-10, H-195);
-        ctx.lineTo(cx, H-235);
-        ctx.lineTo(cx+10, H-195);
-        ctx.lineTo(cx+35, H-205);
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    // 탄환 궤적
-    if (bulletFrames > 0) {
-
-        ctx.strokeStyle = "#fff46a";
-        ctx.lineWidth = 5;
-
-        ctx.beginPath();
-        ctx.moveTo(cx, H-160+recoil);
-        ctx.lineTo(cx, H/2+20);
-        ctx.stroke();
-
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.arc(cx, H/2+20, 4, 0, Math.PI*2);
-        ctx.fill();
-    }
-}
-
-// 조준점
-function drawCrosshair() {
-
-    const cx = W/2;
-    const cy = H/2;
-
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
-
-    ctx.beginPath();
-
-    ctx.moveTo(cx-10, cy);
-    ctx.lineTo(cx-3, cy);
-
-    ctx.moveTo(cx+3, cy);
-    ctx.lineTo(cx+10, cy);
-
-    ctx.moveTo(cx, cy-10);
-    ctx.lineTo(cx, cy-3);
-
-    ctx.moveTo(cx, cy+3);
-    ctx.lineTo(cx, cy+10);
-
-    ctx.stroke();
-
-    if (hitMarker > 0) {
-
-        ctx.strokeStyle = "#ff4444";
-        ctx.lineWidth = 4;
-
-        ctx.beginPath();
-
-        ctx.moveTo(cx-14, cy-14);
-        ctx.lineTo(cx+14, cy+14);
-
-        ctx.moveTo(cx+14, cy-14);
-        ctx.lineTo(cx-14, cy+14);
-
-        ctx.stroke();
-    }
-}
-
-// 조준한 적 확인
-function getTargetEnemy() {
-
-    let target = null;
-    let closest = Infinity;
-
-    for (const enemy of enemies) {
-
-        const dx = enemy.x-player.x;
-        const dy = enemy.y-player.y;
-
-        const dist = Math.hypot(dx, dy);
-
-        const angle = normalizeAngle(
-            Math.atan2(dy, dx)-player.angle
-        );
-
-        if (Math.abs(angle) < 0.10 && dist < closest) {
-
-            const wallDistance = castRay(player.angle);
-
-            if (wallDistance > dist-0.2) {
-                target = enemy;
-                closest = dist;
-            }
-        }
-    }
-
-    return target;
-}
-
-// 발사
-function shoot() {
-
-    if (!gameRunning || gameOver || stageCleared) return;
-    if (ammo <= 0 || shootCooldown > 0) return;
-
-    ammo--;
-
-    shootCooldown = 0.25;
-    muzzleFlash = 7;
-    bulletFrames = 5;
-
-    const target = getTargetEnemy();
-
-    if (target) {
-
-        target.hp--;
-        hitMarker = 8;
-
-        if (target.hp <= 0) {
-
-            score += target.type === "robot" ? 200 : 100;
-
-            enemies = enemies.filter(
-                e => e.hp > 0
-            );
-        }
-    }
-
-    updateHUD();
-}
-
-// 재장전
-function reload() {
-
-    if (!gameRunning) return;
-    if (ammo === maxAmmo || reloadTime > 0) return;
-
-    reloadTime = 1.2;
-}
-
-// 적 생성
 function makeEnemies(count) {
+    const result = [];
+    const positions = [...SPAWNS];
 
-    const types = [
-        {
-            type: "alien",
-            name: "ALIEN",
-            hp: 1,
-            maxHp: 1,
-            speed: 0.65,
-            size: 0.8
-        },
-        {
-            type: "robot",
-            name: "ROBOT",
-            hp: 3,
-            maxHp: 3,
-            speed: 0.35,
-            size: 1.0
-        },
-        {
-            type: "ghost",
-            name: "GHOST",
-            hp: 1,
-            maxHp: 1,
-            speed: 0.9,
-            size: 0.7
-        }
-    ];
-
-    // 시작 지점과 멀리 떨어진 위치만 사용
-    const positions = [
-        [8.5,1.5],
-        [9.5,3.5],
-        [8.5,6.5],
-        [5.5,8.5],
-        [9.5,8.5],
-        [1.5,6.5],
-        [5.5,3.5],
-        [2.5,8.5],
-        [10.5,5.5]
-    ];
-
-    // 위치 섞기
-    for (let i = positions.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+    for (let i = positions.length-1; i > 0; i--) {
+        const j = Math.floor(Math.random()*(i+1));
         [positions[i], positions[j]] = [positions[j], positions[i]];
     }
 
-    const result = [];
+    const types = ["rusher", "rusher", "sniper", "tank", "drone"];
 
-    for (let i = 0; i < count && i < positions.length; i++) {
-
-        const pos = positions[i];
-
-        const type = types[
-            Math.floor(Math.random()*types.length)
-        ];
+    for (let i = 0; i < count; i++) {
+        const type = types[Math.floor(Math.random()*types.length)];
+        const data = TYPES[type];
+        const pos = positions[i % positions.length];
 
         result.push({
-            ...type,
+            type,
             x: pos[0],
             y: pos[1],
-            lastAttack: 0
+            hp: data.hp + (stage-1)*5,
+            maxHp: data.hp + (stage-1)*5,
+            speed: data.speed,
+            damage: data.damage,
+            attackCooldown: Math.random(),
+            aimTimer: 0,
+            aiming: false,
+            targetX: 0,
+            targetY: 0,
+            healCooldown: 0
         });
     }
 
     return result;
 }
 
-// 적 움직임
-function updateEnemies(dt) {
-
-    for (const enemy of enemies) {
-
-        const dx = player.x-enemy.x;
-        const dy = player.y-enemy.y;
-
-        const dist = Math.hypot(dx,dy);
-
-        if (dist > 0.7) {
-
-            const speed =
-                enemy.speed*(1+stage*0.08);
-
-            const nx =
-                enemy.x+(dx/dist)*speed*dt;
-
-            const ny =
-                enemy.y+(dy/dist)*speed*dt;
-
-            if (!isWall(nx,enemy.y)) {
-                enemy.x = nx;
-            }
-
-            if (!isWall(enemy.x,ny)) {
-                enemy.y = ny;
-            }
-
-        } else {
-
-            const now = performance.now();
-
-            if (
-                !enemy.lastAttack ||
-                now-enemy.lastAttack > 1000
-            ) {
-                hp -= 8;
-                damageFlash = 8;
-                enemy.lastAttack = now;
-                updateHUD();
-            }
-        }
-    }
-}
-
-// HUD 갱신
 function updateHUD() {
-
     document.getElementById("hp").textContent =
-        "HP: "+Math.max(0,hp);
+        "HP: " + Math.max(0, Math.ceil(player.hp));
 
     document.getElementById("ammo").textContent =
-        "AMMO: "+ammo;
+        "AMMO: " + player.ammo + "/" + MAX_AMMO;
 
     document.getElementById("score").textContent =
-        "SCORE: "+score;
+        "SCORE: " + score;
 
     document.getElementById("stage").textContent =
-        "STAGE: "+stage;
+        "STAGE: " + stage;
 
-    document.getElementById("enemyCount").textContent =
-        "ENEMIES: "+enemies.length;
+    document.getElementById("time").textContent =
+        "TIME: " + Math.max(0, Math.ceil(timeLeft));
+
+    document.getElementById("hostiles").textContent =
+        "HOSTILES: " + enemies.filter(e => e.hp > 0).length;
+
+    const hpElement = document.getElementById("hp");
+    hpElement.style.color = player.hp <= 30 ? "#ff4444" : "#dce8ff";
+
+    const timeElement = document.getElementById("time");
+    timeElement.style.color = timeLeft <= 15 ? "#ff4444" : "#dce8ff";
 }
 
-// 안내 화면
-function showOverlay(title,message,buttonText,callback) {
-
+function showOverlay(title, message, buttonText, action) {
     const overlay = document.getElementById("overlay");
-
-    overlay.innerHTML = `
-        <h1>${title}</h1>
-        <p>${message}</p>
-        <button id="overlayButton">${buttonText}</button>
-    `;
-
     overlay.style.display = "flex";
+    overlay.querySelector("h1").textContent = title;
+    overlay.querySelectorAll("p")[0].textContent = message;
+    overlay.querySelectorAll("p")[1].textContent =
+        "SCORE: " + score + " | STAGE: " + stage;
 
-    document.getElementById("overlayButton").onclick = callback;
+    const button = document.getElementById("mainButton");
+    button.textContent = buttonText;
+    button.onclick = action;
 }
 
-// 다음 스테이지
-function nextStage() {
+function startGame() {
+    if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
 
-    // 클리어 상태가 아니면 실행하지 않음
+    stage = 1;
+    score = 0;
+    player = {
+        x: 1.5,
+        y: 1.5,
+        angle: 0,
+        hp: 100,
+        ammo: MAX_AMMO
+    };
+
+    timeLeft = 90;
+    enemies = makeEnemies(4);
+    effects = [];
+    keys = {};
+    reloadTime = 0;
+    shootCooldown = 0;
+    damageFlash = 0;
+    muzzleFlash = 0;
+    stageCleared = false;
+    gameOver = false;
+    gameRunning = true;
+    lastTime = 0;
+
+    document.getElementById("overlay").style.display = "none";
+    canvas.focus();
+    updateHUD();
+
+    animationId = requestAnimationFrame(loop);
+}
+
+function nextStage() {
     if (!stageCleared || gameRunning) return;
 
-    // 이전 화면 숨기기
-    document.getElementById("overlay").style.display = "none";
-
     stage++;
-
+    player.hp = Math.min(100, player.hp + 20);
+    player.ammo = MAX_AMMO;
     player.x = 1.5;
     player.y = 1.5;
     player.angle = 0;
 
-    hp = Math.min(100, hp + 20);
-    ammo = maxAmmo;
+    timeLeft = Math.max(45, 90 - (stage-1)*5);
+    enemies = makeEnemies(Math.min(4 + stage*2, 9));
 
-    enemies = makeEnemies(
-        Math.min(4 + stage * 2, 9)
-    );
+    effects = [];
+    keys = {};
+    reloadTime = 0;
+    shootCooldown = 0;
+    damageFlash = 0;
+    muzzleFlash = 0;
 
     stageCleared = false;
     gameOver = false;
     gameRunning = true;
-
     lastTime = 0;
-    keys = {};
 
+    document.getElementById("overlay").style.display = "none";
     updateHUD();
-
     canvas.focus();
 
-    // 게임 루프 한 번만 시작
     animationId = requestAnimationFrame(loop);
 }
 
-// 스테이지 클리어
 function clearStage() {
-
-    if (stageCleared || gameOver) return;
+    if (!gameRunning || stageCleared) return;
 
     gameRunning = false;
     stageCleared = true;
+    animationId = null;
 
     showOverlay(
-        "STAGE CLEAR!",
-        "모든 적을 처치했다!<br>현재 점수: "+score,
+        "STAGE CLEAR",
+        "ALL HOSTILES ELIMINATED",
         "NEXT STAGE",
         nextStage
     );
 }
 
-// 게임 오버
-function endGame() {
-
+function endGame(reason) {
     if (gameOver) return;
 
     gameRunning = false;
     gameOver = true;
+    animationId = null;
 
     showOverlay(
         "MISSION FAILED",
-        "최종 점수: "+score+
-        "<br>도달 스테이지: "+stage,
+        reason,
         "RESTART",
         startGame
     );
 }
 
-// 효과 시간 갱신
-function updateEffects(dt) {
+function movePlayer(dt) {
+    const moveSpeed = 2.6;
+    const turnSpeed = 2.1;
 
-    if (muzzleFlash > 0) muzzleFlash--;
-    if (bulletFrames > 0) bulletFrames--;
-    if (hitMarker > 0) hitMarker--;
-    if (damageFlash > 0) damageFlash--;
+    if (keys["ArrowLeft"]) player.angle -= turnSpeed*dt;
+    if (keys["ArrowRight"]) player.angle += turnSpeed*dt;
 
-    if (shootCooldown > 0) {
-        shootCooldown -= dt;
-    }
+    let forward = 0;
+    let side = 0;
 
-    // 재장전 시간 계산
-    if (reloadTime > 0) {
+    if (keys["KeyW"]) forward += 1;
+    if (keys["KeyS"]) forward -= 1;
+    if (keys["KeyD"]) side += 1;
+    if (keys["KeyA"]) side -= 1;
 
-        reloadTime -= dt;
+    const length = Math.hypot(forward, side) || 1;
+    forward /= length;
+    side /= length;
 
-        if (reloadTime <= 0) {
-            ammo = maxAmmo;
-            reloadTime = 0;
-            updateHUD();
-        }
-    }
+    const dx = (
+        Math.cos(player.angle)*forward -
+        Math.sin(player.angle)*side
+    ) * moveSpeed * dt;
+
+    const dy = (
+        Math.sin(player.angle)*forward +
+        Math.cos(player.angle)*side
+    ) * moveSpeed * dt;
+
+    if (canMove(player.x+dx, player.y)) player.x += dx;
+    if (canMove(player.x, player.y+dy)) player.y += dy;
 }
 
-// 화면 그리기
-function render() {
+function castRay(angle) {
+    const step = 0.025;
+    let d = 0;
 
-    drawWorld();
-    drawEnemies();
-    drawCrosshair();
-    drawGun();
+    while (d < 15) {
+        d += step;
+        const x = player.x + Math.cos(angle)*d;
+        const y = player.y + Math.sin(angle)*d;
 
-    if (damageFlash > 0) {
-
-        ctx.fillStyle = "rgba(255,0,0,0.22)";
-        ctx.fillRect(0,0,W,H);
+        if (isWall(x, y)) return d;
     }
 
-    if (reloadTime > 0) {
+    return 15;
+}
 
-        ctx.fillStyle = "#ffff66";
-        ctx.font = "20px monospace";
+function drawWorld() {
+    const sky = ctx.createLinearGradient(0, 0, 0, H/2);
+    sky.addColorStop(0, "#111827");
+    sky.addColorStop(1, "#334155");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H/2);
 
-        ctx.fillText(
-            "RELOADING...",
-            W/2-65,
-            H-20
+    const floor = ctx.createLinearGradient(0, H/2, 0, H);
+    floor.addColorStop(0, "#252b35");
+    floor.addColorStop(1, "#080a0e");
+    ctx.fillStyle = floor;
+    ctx.fillRect(0, H/2, W, H/2);
+
+    zBuffer = [];
+
+    for (let i = 0; i < RAYS; i++) {
+        const camera = (i/RAYS - 0.5);
+        const angle = player.angle + camera*FOV;
+        const rawDist = castRay(angle);
+        const corrected = rawDist * Math.cos(camera*FOV);
+        zBuffer[i] = corrected;
+
+        const wallHeight = Math.min(H, H/(corrected*0.72));
+        const shade = Math.max(35, 180 - corrected*17);
+
+        ctx.fillStyle = `rgb(${shade},${shade},${shade+12})`;
+        ctx.fillRect(
+            i*W/RAYS,
+            H/2-wallHeight/2,
+            W/RAYS+1,
+            wallHeight
         );
     }
 }
 
-// 게임 반복 실행
-function loop(timestamp) {
+function drawEnemies() {
+    const visible = enemies
+        .filter(e => e.hp > 0)
+        .map(e => ({
+            enemy: e,
+            dist: distance(player.x, player.y, e.x, e.y)
+        }))
+        .sort((a,b) => b.dist-a.dist);
 
+    for (const item of visible) {
+        const e = item.enemy;
+        const d = item.dist;
+
+        const angle = normalizeAngle(
+            Math.atan2(e.y-player.y, e.x-player.x)-player.angle
+        );
+
+        if (Math.abs(angle) > FOV/2+0.2) continue;
+
+        const screenX = W/2 + (angle/FOV)*W;
+        const size = Math.min(170, H/(d*0.48));
+        const screenY = H/2 + size*0.12;
+
+        const rayIndex = Math.floor(screenX/W*RAYS);
+        if (rayIndex >= 0 && rayIndex < RAYS && d > zBuffer[rayIndex]+0.2) {
+            continue;
+        }
+
+        const data = TYPES[e.type];
+
+        ctx.save();
+
+        if (e.aiming) {
+            ctx.strokeStyle = "#ff3333";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(screenX, screenY-size*0.4);
+            ctx.lineTo(W/2, H/2);
+            ctx.stroke();
+        }
+
+        ctx.font = `${size*0.55}px monospace`;
+        ctx.textAlign = "center";
+        ctx.fillText(data.symbol, screenX, screenY);
+
+        ctx.fillStyle = "#111";
+        ctx.fillRect(screenX-size*0.35, screenY-size*0.85, size*0.7, 7);
+
+        ctx.fillStyle = data.color;
+        ctx.fillRect(
+            screenX-size*0.35,
+            screenY-size*0.85,
+            size*0.7*Math.max(0,e.hp/e.maxHp),
+            7
+        );
+
+        ctx.font = "10px monospace";
+        ctx.fillStyle = data.color;
+        ctx.fillText(data.name, screenX, screenY-size*0.95);
+
+        ctx.restore();
+    }
+}
+
+function drawGun() {
+    const bob = (
+        keys["KeyW"] || keys["KeyS"] ||
+        keys["KeyA"] || keys["KeyD"]
+    ) ? Math.sin(performance.now()*0.012)*5 : 0;
+
+    ctx.fillStyle = "#202b3b";
+    ctx.fillRect(W/2-45, H-90+bob, 90, 90);
+
+    ctx.fillStyle = "#64748b";
+    ctx.fillRect(W/2-25, H-115+bob, 50, 55);
+
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(W/2-13, H-137+bob, 26, 30);
+
+    if (muzzleFlash > 0) {
+        ctx.fillStyle = "#ffe66d";
+        ctx.beginPath();
+        ctx.moveTo(W/2, H-145+bob);
+        ctx.lineTo(W/2-28, H-195+bob);
+        ctx.lineTo(W/2, H-180+bob);
+        ctx.lineTo(W/2+28, H-195+bob);
+        ctx.closePath();
+        ctx.fill();
+    }
+}
+
+function drawCrosshair() {
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(W/2-10, H/2);
+    ctx.lineTo(W/2-4, H/2);
+    ctx.moveTo(W/2+4, H/2);
+    ctx.lineTo(W/2+10, H/2);
+    ctx.moveTo(W/2, H/2-10);
+    ctx.lineTo(W/2, H/2-4);
+    ctx.moveTo(W/2, H/2+4);
+    ctx.lineTo(W/2, H/2+10);
+    ctx.stroke();
+
+    if (hitFlash > 0) {
+        ctx.strokeStyle = "#ff3333";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(W/2-12,H/2-12);
+        ctx.lineTo(W/2+12,H/2+12);
+        ctx.moveTo(W/2+12,H/2-12);
+        ctx.lineTo(W/2-12,H/2+12);
+        ctx.stroke();
+    }
+}
+
+function shoot() {
+    if (!gameRunning || reloadTime > 0 || shootCooldown > 0) return;
+
+    if (player.ammo <= 0) {
+        warningText = "OUT OF AMMO! PRESS R";
+        warningTimer = 1;
+        return;
+    }
+
+    player.ammo--;
+    shootCooldown = 0.25;
+    muzzleFlash = 0.09;
+
+    let target = null;
+    let bestDist = 999;
+
+    for (const e of enemies) {
+        if (e.hp <= 0) continue;
+
+        const d = distance(player.x, player.y, e.x, e.y);
+        const angle = normalizeAngle(
+            Math.atan2(e.y-player.y, e.x-player.x)-player.angle
+        );
+
+        if (
+            Math.abs(angle) < 0.12 &&
+            d < bestDist &&
+            hasLineOfSight(player.x, player.y, e.x, e.y)
+        ) {
+            target = e;
+            bestDist = d;
+        }
+    }
+
+    if (target) {
+        const damage = target.type === "tank" ? 30 : 45;
+        target.hp -= damage;
+        hitFlash = 0.12;
+
+        if (target.hp <= 0) {
+            score += target.type === "tank" ? 40 : 20;
+        }
+    }
+
+    updateHUD();
+}
+
+function reload() {
+    if (!gameRunning || reloadTime > 0 || player.ammo === MAX_AMMO) return;
+
+    if (player.ammo < MAX_AMMO) {
+        reloadTime = 1.25;
+        warningText = "RELOADING...";
+        warningTimer = 1.25;
+    }
+}
+
+function updateEnemies(dt) {
+    for (const e of enemies) {
+        if (e.hp <= 0) continue;
+
+        const d = distance(player.x, player.y, e.x, e.y);
+        const dx = player.x-e.x;
+        const dy = player.y-e.y;
+        const angle = Math.atan2(dy, dx);
+
+        e.attackCooldown -= dt;
+
+        if (e.type === "rusher") {
+            if (d > 0.8) {
+                const nx = e.x + Math.cos(angle)*e.speed*dt;
+                const ny = e.y + Math.sin(angle)*e.speed*dt;
+
+                if (canMove(nx,e.y)) e.x = nx;
+                if (canMove(e.x,ny)) e.y = ny;
+            } else if (e.attackCooldown <= 0) {
+                player.hp -= e.damage;
+                damageFlash = 0.25;
+                e.attackCooldown = 1.1;
+            }
+        }
+
+        else if (e.type === "tank") {
+            if (d > 1.15) {
+                const nx = e.x + Math.cos(angle)*e.speed*dt;
+                const ny = e.y + Math.sin(angle)*e.speed*dt;
+
+                if (canMove(nx,e.y)) e.x = nx;
+                if (canMove(e.x,ny)) e.y = ny;
+            } else if (e.attackCooldown <= 0) {
+                player.hp -= e.damage;
+                damageFlash = 0.35;
+                e.attackCooldown = 1.7;
+            }
+        }
+
+        else if (e.type === "sniper") {
+            if (d < 3.5) {
+                const nx = e.x - Math.cos(angle)*e.speed*dt;
+                const ny = e.y - Math.sin(angle)*e.speed*dt;
+                if (canMove(nx,e.y)) e.x = nx;
+                if (canMove(e.x,ny)) e.y = ny;
+            }
+
+            if (
+                d < 10 &&
+                hasLineOfSight(e.x,e.y,player.x,player.y)
+            ) {
+                if (!e.aiming && e.attackCooldown <= 0) {
+                    e.aiming = true;
+                    e.aimTimer = 1.3;
+                    e.targetX = player.x;
+                    e.targetY = player.y;
+                }
+
+                if (e.aiming) {
+                    e.aimTimer -= dt;
+
+                    if (e.aimTimer <= 0) {
+                        const targetDistance = distance(
+                            player.x, player.y,
+                            e.targetX, e.targetY
+                        );
+
+                        if (targetDistance < 0.85) {
+                            player.hp -= e.damage;
+                            damageFlash = 0.45;
+                            warningText = "SNIPER HIT!";
+                            warningTimer = 0.8;
+                        }
+
+                        e.aiming = false;
+                        e.attackCooldown = 2.2;
+                    }
+                }
+            } else {
+                e.aiming = false;
+            }
+        }
+
+        else if (e.type === "drone") {
+            if (d < 2.2) {
+                const nx = e.x - Math.cos(angle)*e.speed*dt;
+                const ny = e.y - Math.sin(angle)*e.speed*dt;
+                if (canMove(nx,e.y)) e.x = nx;
+                if (canMove(e.x,ny)) e.y = ny;
+            }
+
+            e.healCooldown -= dt;
+
+            if (e.healCooldown <= 0) {
+                const ally = enemies.find(other =>
+                    other !== e &&
+                    other.hp > 0 &&
+                    other.hp < other.maxHp &&
+                    distance(e.x,e.y,other.x,other.y) < 4
+                );
+
+                if (ally) {
+                    ally.hp = Math.min(ally.maxHp, ally.hp+12);
+                    effects.push({
+                        x: ally.x,
+                        y: ally.y,
+                        life: 0.5,
+                        type: "heal"
+                    });
+                }
+
+                e.healCooldown = 2.8;
+            }
+        }
+    }
+
+    if (damageFlash > 0) damageFlash -= dt;
+    if (warningTimer > 0) warningTimer -= dt;
+    if (muzzleFlash > 0) muzzleFlash -= dt;
+    if (hitFlash > 0) hitFlash -= dt;
+    if (shootCooldown > 0) shootCooldown -= dt;
+
+    if (reloadTime > 0) {
+        reloadTime -= dt;
+        if (reloadTime <= 0) {
+            player.ammo = MAX_AMMO;
+            warningText = "RELOADED";
+            warningTimer = 0.7;
+        }
+    }
+
+    effects = effects.filter(e => {
+        e.life -= dt;
+        return e.life > 0;
+    });
+}
+
+function render() {
+    drawWorld();
+    drawEnemies();
+    drawGun();
+    drawCrosshair();
+
+    if (damageFlash > 0) {
+        ctx.fillStyle = `rgba(255,0,0,${Math.min(0.35,damageFlash)})`;
+        ctx.fillRect(0,0,W,H);
+    }
+
+    if (player.hp <= 30) {
+        const pulse = 0.08 + Math.abs(Math.sin(performance.now()*0.006))*0.12;
+        ctx.fillStyle = `rgba(255,0,0,${pulse})`;
+        ctx.fillRect(0,0,W,H);
+    }
+
+    if (reloadTime > 0) {
+        ctx.fillStyle = "#ffe66d";
+        ctx.font = "bold 20px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("RELOADING...",W/2,H/2+45);
+    }
+
+    if (warningTimer > 0) {
+        document.getElementById("warning").textContent = warningText;
+    } else {
+        document.getElementById("warning").textContent = "";
+    }
+
+    for (const e of effects) {
+        const angle = normalizeAngle(
+            Math.atan2(e.y-player.y,e.x-player.x)-player.angle
+        );
+        if (Math.abs(angle) < FOV/2) {
+            const x = W/2 + angle/FOV*W;
+            ctx.fillStyle = "#5dff9a";
+            ctx.font = "bold 16px monospace";
+            ctx.fillText("+HEAL",x,H/2-40);
+        }
+    }
+}
+
+function loop(timestamp) {
     if (!gameRunning) {
         animationId = null;
         return;
     }
 
-    const dt = Math.min(
-        (timestamp-(lastTime || timestamp))/1000,
-        0.05
-    );
-
+    if (!lastTime) lastTime = timestamp;
+    const dt = Math.min((timestamp-lastTime)/1000,0.05);
     lastTime = timestamp;
+
+    timeLeft -= dt;
 
     movePlayer(dt);
     updateEnemies(dt);
-    updateEffects(dt);
-    render();
-    updateHUD();
 
-    if (hp <= 0) {
-        endGame();
-        animationId = null;
+    if (player.hp <= 0) {
+        player.hp = 0;
+        updateHUD();
+        endGame("YOU WERE ELIMINATED");
         return;
     }
 
-    if (enemies.length === 0) {
+    if (timeLeft <= 0) {
+        timeLeft = 0;
+        updateHUD();
+        endGame("TIME LIMIT EXCEEDED");
+        return;
+    }
+
+    if (enemies.every(e => e.hp <= 0)) {
+        updateHUD();
         clearStage();
-        animationId = null;
         return;
     }
+
+    updateHUD();
+    render();
 
     animationId = requestAnimationFrame(loop);
 }
 
-// 키보드 입력
-document.addEventListener("keydown", e => {
+window.addEventListener("keydown", (event) => {
+    const allowed = [
+        "KeyW","KeyA","KeyS","KeyD",
+        "ArrowLeft","ArrowRight","Space","KeyR"
+    ];
 
-    const key = e.key.toLowerCase();
+    if (allowed.includes(event.code)) event.preventDefault();
 
-    if (
-        ["w","a","s","d","arrowleft","arrowright"," "]
-        .includes(key)
-    ) {
-        e.preventDefault();
-    }
+    if (event.code === "Space" && !event.repeat) shoot();
+    if (event.code === "KeyR" && !event.repeat) reload();
 
-    keys[key] = true;
-
-    if (key === " " && !e.repeat) {
-        shoot();
-    }
-
-    if (key === "r" && !e.repeat) {
-        reload();
-    }
+    keys[event.code] = true;
 });
 
-document.addEventListener("keyup", e => {
-    keys[e.key.toLowerCase()] = false;
+window.addEventListener("keyup", (event) => {
+    keys[event.code] = false;
 });
 
-// 창을 벗어나면 이동키 초기화
 window.addEventListener("blur", () => {
     keys = {};
 });
 
-// 캔버스 클릭 시 키보드 입력 준비
 canvas.addEventListener("click", () => {
     canvas.focus();
+    if (gameRunning) shoot();
 });
 
-// 첫 화면 HUD 표시
 updateHUD();
-
 </script>
 </body>
 </html>
 """
 
-html = html.replace("__ENEMIES__", enemy_json)
+components.html(game_html, height=540, scrolling=False)
 
-components.html(
-    html,
-    height=570,
-    scrolling=False
-)
+st.markdown("""
+---
+**MISSION GUIDE**
+- RUSHER: 빠르게 추격하는 적
+- SNIPER: 붉은 조준 표시가 나타나면 위치를 바꿔 공격을 피하세요.
+- TANK: 체력이 높으므로 탄약을 충분히 확보하세요.
+- DRONE: 주변 적을 회복시키므로 먼저 처치하는 것이 좋습니다.
+""")
