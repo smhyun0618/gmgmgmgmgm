@@ -907,18 +907,11 @@ function showOverlay(title,message,buttonText,callback) {
 }
 
 // 다음 스테이지
-function nextStage() {
-    stage++;
-
-    player.x = 1.5;
-    player.y = 1.5;
-    player.angle = 0;
-
-    hp = Math.min(100,hp+20);
+ hp = Math.min(100, hp + 20);
     ammo = maxAmmo;
 
     enemies = makeEnemies(
-        Math.min(4+stage*2,9)
+        Math.min(4 + stage * 2, 9)
     );
 
     stageCleared = false;
@@ -931,6 +924,7 @@ function nextStage() {
 
     canvas.focus();
 
+    // 새로운 게임 루프 시작
     animationId = requestAnimationFrame(loop);
 }
 
