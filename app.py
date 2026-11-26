@@ -133,6 +133,7 @@ body {
 canvas {
     display: block;
     width: 100%;
+    height: 450px;
     background: black;
     image-rendering: pixelated;
     outline: none;
