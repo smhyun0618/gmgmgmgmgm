@@ -1,20 +1,49 @@
 
 import streamlit as st
+import streamlit.components.v1 as components
 import random
-
-# ==========================================
-# RETRO STRIKE 2.0
-# ==========================================
+import json
 
 st.set_page_config(
-    page_title="RETRO STRIKE 2.0",
+    page_title="RETRO STRIKE 3.0",
     page_icon="🎮",
     layout="wide"
 )
 
-# ==========================================
-# 1. 디자인 CSS
-# ==========================================
+# ======================================
+# 1. Python으로 적 생성
+# ======================================
+
+def create_enemies(count=5):
+    enemies = []
+
+    positions = [
+        (3.5, 3.5), (5.5, 3.5),
+        (3.5, 5.5), (5.5, 5.5),
+        (7.5, 7.5), (2.5, 7.5),
+        (7.5, 2.5), (1.5, 5.5)
+    ]
+
+    random.shuffle(positions)
+
+    for i in range(min(count, len(positions))):
+        x, y = positions[i]
+
+        enemies.append({
+            "x": x,
+            "y": y,
+            "hp": 2,
+            "alive": True
+        })
+
+    return enemies
+
+
+initial_enemies = create_enemies(5)
+
+# ======================================
+# 2. 화면 디자인
+# ======================================
 
 st.markdown("""
 <style>
@@ -22,908 +51,1028 @@ st.markdown("""
     background: #080d18;
     color: #d9faff;
 }
-header {visibility: hidden;}
+header {visibility:hidden;}
 
-h1, h2, h3 {
-    color: #54eaff !important;
-    font-family: monospace;
+h1 {
+    color:#54eaff !important;
+    font-family:monospace;
 }
 
-div.stButton > button {
-    background: #12283b;
-    color: #61eaff;
-    border: 1px solid #27c8e5;
-    border-radius: 7px;
-    font-weight: bold;
-    min-height: 45px;
-    transition: 0.15s;
+.block-container {
+    padding-top:1rem;
+    max-width:1200px;
 }
 
-div.stButton > button:hover {
-    background: #176078;
-    color: white;
-    border-color: #a0faff;
-}
-
-.metric-box {
-    background: linear-gradient(135deg,#102337,#172b42);
-    border: 1px solid #2d9eae;
-    border-radius: 9px;
-    padding: 13px;
-    text-align: center;
-    margin-bottom: 8px;
-}
-
-.metric-label {
-    color: #7bafc5;
-    font-size: 12px;
-}
-
-.metric-value {
-    color: #55efff;
-    font-size: 27px;
-    font-weight: bold;
-    font-family: monospace;
-}
-
-.fps-screen {
-    height: 350px;
-    position: relative;
-    overflow: hidden;
-    border: 3px solid #2dd7ed;
-    border-radius: 8px;
-    background:
-        linear-gradient(180deg,#10172e 0%,#26374a 62%,#101923 63%,#060a11 100%);
-}
-
-.fps-ceiling {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 60%;
-    background: linear-gradient(#11172b,#26364a);
-}
-
-.fps-floor {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    height: 38%;
-    background: repeating-linear-gradient(
-        0deg,#101923 0px,#101923 18px,#1a3440 19px
-    );
-    clip-path: polygon(35% 0,65% 0,100% 100%,0 100%);
-}
-
-.fps-tunnel {
-    position: absolute;
-    inset: 10% 13% 12%;
-    border: 3px solid #26798b;
-    box-shadow: 0 0 20px #12566c;
-    clip-path: polygon(25% 0,75% 0,100% 100%,0 100%);
-}
-
-.fps-enemy {
-    position: absolute;
-    left: 50%;
-    top: 43%;
-    transform: translate(-50%,-50%);
-    font-size: 85px;
-    filter: drop-shadow(0 0 18px #00eaff);
-    z-index: 4;
-}
-
-.fps-crosshair {
-    position: absolute;
-    left: 50%;
-    top: 49%;
-    color: #c9ffff;
-    font-size: 25px;
-    z-index: 5;
-}
-
-.fps-gun {
-    position: absolute;
-    bottom: -20px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 85px;
-    z-index: 6;
-    filter: drop-shadow(0 0 12px #00bfff);
-}
-
-.fps-info {
-    position: absolute;
-    top: 12px;
-    left: 15px;
-    z-index: 7;
-    color: #71f6ff;
-    font-family: monospace;
-    font-size: 13px;
-}
-
-.map-cell {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #142337;
-    border: 1px solid #27445c;
-    font-size: 16px;
-}
-
-.map-row {
-    display: flex;
-    justify-content: center;
-}
-
-.log-box {
-    background: #101c2b;
-    border-left: 3px solid #32cfe7;
-    padding: 10px;
-    margin: 5px 0;
-    color: #b9d9e7;
-    font-family: monospace;
-    font-size: 13px;
-}
 </style>
 """, unsafe_allow_html=True)
 
-
-# ==========================================
-# 2. 게임 초기화
-# ==========================================
-
-def initialize():
-    st.session_state.hp = 100
-    st.session_state.armor = 50
-    st.session_state.ammo = 20
-    st.session_state.max_ammo = 20
-
-    st.session_state.score = 0
-    st.session_state.kills = 0
-    st.session_state.stage = 1
-
-    st.session_state.px = 4
-    st.session_state.py = 4
-    st.session_state.direction = 0
-
-    st.session_state.enemies = []
-    st.session_state.items = []
-
-    st.session_state.started = True
-    st.session_state.game_over = False
-    st.session_state.message = "MISSION START!"
-    st.session_state.log = ["SYSTEM ONLINE"]
-
-    create_enemies()
-    create_items()
-
-
-# ==========================================
-# 3. 적 생성
-# ==========================================
-
-def create_enemies():
-
-    st.session_state.enemies = []
-
-    count = 2 + st.session_state.stage
-
-    enemy_types = [
-        {"name": "SCOUT", "hp": 1, "damage": 5, "icon": "🤖"},
-        {"name": "SOLDIER", "hp": 2, "damage": 10, "icon": "👾"},
-        {"name": "ELITE", "hp": 3, "damage": 15, "icon": "💀"}
-    ]
-
-    for i in range(count):
-
-        enemy = random.choice(enemy_types)
-
-        x = random.randint(0, 8)
-        y = random.randint(0, 8)
-
-        attempts = 0
-
-        while (
-            (x, y) == (st.session_state.px, st.session_state.py)
-            or any(
-                e["x"] == x and e["y"] == y
-                for e in st.session_state.enemies
-            )
-        ) and attempts < 100:
-
-            x = random.randint(0, 8)
-            y = random.randint(0, 8)
-            attempts += 1
-
-        if attempts < 100:
-            st.session_state.enemies.append({
-                "x": x,
-                "y": y,
-                "name": enemy["name"],
-                "hp": enemy["hp"] + st.session_state.stage // 3,
-                "damage": enemy["damage"],
-                "icon": enemy["icon"]
-            })
-
-
-# ==========================================
-# 4. 아이템 생성
-# ==========================================
-
-def create_items():
-
-    st.session_state.items = []
-
-    for i in range(3):
-
-        x = random.randint(0, 8)
-        y = random.randint(0, 8)
-
-        item_type = random.choice([
-            "MEDKIT", "AMMO", "ARMOR"
-        ])
-
-        st.session_state.items.append({
-            "x": x,
-            "y": y,
-            "type": item_type
-        })
-
-
-# ==========================================
-# 5. 방향 시스템
-# ==========================================
-
-directions = [
-    (0, -1),
-    (1, 0),
-    (0, 1),
-    (-1, 0)
-]
-
-direction_names = [
-    "NORTH",
-    "EAST",
-    "SOUTH",
-    "WEST"
-]
-
-
-def turn_left():
-
-    st.session_state.direction = (
-        st.session_state.direction - 1
-    ) % 4
-
-    enemy_turn()
-
-
-def turn_right():
-
-    st.session_state.direction = (
-        st.session_state.direction + 1
-    ) % 4
-
-    enemy_turn()
-
-
-# ==========================================
-# 6. 아이템 획득
-# ==========================================
-
-def collect_item():
-
-    px = st.session_state.px
-    py = st.session_state.py
-
-    for item in st.session_state.items[:]:
-
-        if (item["x"], item["y"]) == (px, py):
-
-            if item["type"] == "MEDKIT":
-                st.session_state.hp = min(
-                    100, st.session_state.hp + 30
-                )
-                st.session_state.message = "MEDKIT +30 HP"
-
-            elif item["type"] == "AMMO":
-                st.session_state.ammo += 10
-                st.session_state.message = "AMMO +10"
-
-            elif item["type"] == "ARMOR":
-                st.session_state.armor = min(
-                    100, st.session_state.armor + 25
-                )
-                st.session_state.message = "ARMOR +25"
-
-            st.session_state.items.remove(item)
-
-
-# ==========================================
-# 7. 플레이어 이동
-# ==========================================
-
-def move_player(distance):
-
-    if st.session_state.game_over:
-        return
-
-    dx, dy = directions[
-        st.session_state.direction
-    ]
-
-    nx = st.session_state.px + dx * distance
-    ny = st.session_state.py + dy * distance
-
-    if 0 <= nx <= 8 and 0 <= ny <= 8:
-
-        st.session_state.px = nx
-        st.session_state.py = ny
-
-        collect_item()
-
-        enemy_turn()
-
-    else:
-        st.session_state.message = "BLOCKED!"
-
-
-# ==========================================
-# 8. 적 AI
-# ==========================================
-
-def enemy_turn():
-
-    if st.session_state.game_over:
-        return
-
-    px = st.session_state.px
-    py = st.session_state.py
-
-    occupied = set()
-
-    for enemy in st.session_state.enemies:
-
-        x = enemy["x"]
-        y = enemy["y"]
-
-        distance = abs(px - x) + abs(py - y)
-
-        if distance <= 1:
-
-            damage = enemy["damage"]
-
-            armor_damage = min(
-                st.session_state.armor,
-                damage
-            )
-
-            st.session_state.armor -= armor_damage
-
-            remaining = damage - armor_damage
-
-            st.session_state.hp -= remaining
-
-            st.session_state.log.append(
-                f"ENEMY ATTACK! -{damage} DAMAGE"
-            )
-
-        else:
-
-            if random.random() < 0.7:
-
-                if abs(px - x) > abs(py - y):
-                    dx = 1 if px > x else -1
-                    dy = 0
-                else:
-                    dx = 0
-                    dy = 1 if py > y else -1
-
-                if random.random() < 0.25:
-                    dx, dy = random.choice(directions)
-
-                nx = x + dx
-                ny = y + dy
-
-                if (
-                    0 <= nx <= 8
-                    and 0 <= ny <= 8
-                    and (nx, ny) != (px, py)
-                    and (nx, ny) not in occupied
-                ):
-                    x, y = nx, ny
-
-        enemy["x"] = x
-        enemy["y"] = y
-
-        occupied.add((x, y))
-
-    if st.session_state.hp <= 0:
-
-        st.session_state.hp = 0
-        st.session_state.game_over = True
-        st.session_state.message = "MISSION FAILED!"
-
-
-# ==========================================
-# 9. 공격 시스템
-# ==========================================
-
-def shoot():
-
-    if st.session_state.game_over:
-        return
-
-    if st.session_state.ammo <= 0:
-
-        st.session_state.message = "OUT OF AMMO! RELOAD!"
-        return
-
-    st.session_state.ammo -= 1
-
-    dx, dy = directions[
-        st.session_state.direction
-    ]
-
-    px = st.session_state.px
-    py = st.session_state.py
-
-    target = None
-
-    # 정면의 가장 가까운 적 탐색
-    for distance in range(1, 7):
-
-        tx = px + dx * distance
-        ty = py + dy * distance
-
-        for enemy in st.session_state.enemies:
-
-            if enemy["x"] == tx and enemy["y"] == ty:
-                target = enemy
-                break
-
-        if target is not None:
-            break
-
-    if target:
-
-        target["hp"] -= 1
-
-        if target["hp"] <= 0:
-
-            st.session_state.enemies.remove(target)
-
-            st.session_state.score += 100
-            st.session_state.kills += 1
-
-            st.session_state.message = (
-                "TARGET DESTROYED! +100 SCORE"
-            )
-
-            st.session_state.log.append(
-                "TARGET ELIMINATED!"
-            )
-
-        else:
-
-            st.session_state.score += 25
-
-            st.session_state.message = (
-                "ENEMY HIT! -1 ENEMY HP"
-            )
-
-        if not st.session_state.enemies:
-            st.session_state.message = "STAGE CLEAR!"
-
-    else:
-
-        st.session_state.message = "SHOT MISSED!"
-
-    enemy_turn()
-
-
-# ==========================================
-# 10. 재장전
-# ==========================================
-
-def reload_weapon():
-
-    if st.session_state.game_over:
-        return
-
-    need = (
-        st.session_state.max_ammo
-        - st.session_state.ammo
-    )
-
-    if need > 0:
-
-        st.session_state.ammo += need
-
-        st.session_state.message = "RELOADING COMPLETE!"
-
-        enemy_turn()
-
-
-# ==========================================
-# 11. 다음 스테이지
-# ==========================================
-
-def next_stage():
-
-    st.session_state.stage += 1
-
-    st.session_state.hp = min(
-        100, st.session_state.hp + 20
-    )
-
-    st.session_state.armor = min(
-        100, st.session_state.armor + 10
-    )
-
-    st.session_state.ammo = st.session_state.max_ammo
-
-    st.session_state.px = 4
-    st.session_state.py = 4
-    st.session_state.direction = 0
-
-    create_enemies()
-    create_items()
-
-    st.session_state.message = "NEW STAGE START!"
-
-
-# ==========================================
-# 12. 화면에 보이는 적 탐색
-# ==========================================
-
-def find_visible_enemy():
-
-    dx, dy = directions[
-        st.session_state.direction
-    ]
-
-    px = st.session_state.px
-    py = st.session_state.py
-
-    for distance in range(1, 7):
-
-        tx = px + dx * distance
-        ty = py + dy * distance
-
-        for enemy in st.session_state.enemies:
-
-            if enemy["x"] == tx and enemy["y"] == ty:
-                return enemy, distance
-
-    return None, None
-
-
-# ==========================================
-# 13. 게임 타이틀
-# ==========================================
-
 st.markdown("""
-# ⚡ RETRO STRIKE 2.0
-### SPACE ARENA // SURVIVAL PROTOCOL
+# ⚡ RETRO STRIKE 3.0
+### DOOM EDITION // FIRST PERSON SURVIVAL
 
-`SYSTEM ONLINE` | `MISSION: ELIMINATE ALL HOSTILES`
+`WASD MOVEMENT` | `RAYCASTING ENGINE` | `SPACE COMBAT`
 """)
 
-st.markdown("---")
-
-
-# ==========================================
-# 14. 게임 시작 화면
-# ==========================================
-
-if "started" not in st.session_state:
-    st.session_state.started = False
-
-if not st.session_state.started:
-
-    st.markdown("""
-    <div style="
-    background:linear-gradient(120deg,#101b30,#173a4d);
-    border:2px solid #38d9ed;
-    border-radius:12px;
-    padding:45px;
-    text-align:center;
-    ">
-    <h1>⚡ RETRO STRIKE</h1>
-    <h3>ENTER THE BATTLEFIELD</h3>
-    <p>Destroy all hostile drones.</p>
-    <p>Survive every stage.</p>
-    <h2>MISSION START</h2>
-    </div>
-    """, unsafe_allow_html=True)
-
-    if st.button("▶ START MISSION", use_container_width=True):
-        initialize()
-        st.rerun()
-
-    st.stop()
-
-
-# ==========================================
-# 15. 게임 상태창
-# ==========================================
-
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-    st.markdown(f"""
-    <div class="metric-box">
-    <div class="metric-label">❤️ HEALTH</div>
-    <div class="metric-value">{st.session_state.hp}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with c2:
-    st.markdown(f"""
-    <div class="metric-box">
-    <div class="metric-label">🛡️ ARMOR</div>
-    <div class="metric-value">{st.session_state.armor}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with c3:
-    st.markdown(f"""
-    <div class="metric-box">
-    <div class="metric-label">🏆 SCORE</div>
-    <div class="metric-value">{st.session_state.score}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with c4:
-    st.markdown(f"""
-    <div class="metric-box">
-    <div class="metric-label">🚀 STAGE</div>
-    <div class="metric-value">{st.session_state.stage}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-
-st.progress(st.session_state.hp / 100)
-
 st.caption(
-    f"WEAPON: ENERGY RIFLE | "
-    f"AMMO: {st.session_state.ammo} | "
-    f"KILLS: {st.session_state.kills}"
+    "적을 모두 처치하고 다음 스테이지로 진입하세요."
 )
 
-st.markdown("---")
+# ======================================
+# 3. 게임 화면 HTML + JavaScript
+# ======================================
 
+game_data = json.dumps(initial_enemies)
 
-# ==========================================
-# 16. FPS 시점 화면
-# ==========================================
+html = r"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
 
-st.subheader("📡 FIRST PERSON VIEW")
+<style>
+* {
+    box-sizing:border-box;
+}
 
-enemy, distance = find_visible_enemy()
+body {
+    margin:0;
+    background:#080d18;
+    color:#65eaff;
+    font-family:monospace;
+    overflow:hidden;
+}
 
-if enemy:
+#game {
+    width:100%;
+    max-width:1100px;
+    margin:auto;
+}
 
-    enemy_view = f"""
-    <div class="fps-enemy">{enemy['icon']}</div>
-    <div style="
-    position:absolute;
-    top:68%;
-    left:50%;
-    transform:translateX(-50%);
-    z-index:7;
-    color:#ff5b67;
+#hud {
+    display:flex;
+    justify-content:space-around;
+    flex-wrap:wrap;
+    gap:7px;
+    padding:12px;
+    background:#101c30;
+    border:1px solid #246c86;
+    font-size:14px;
+}
+
+.stat {
+    min-width:90px;
+    text-align:center;
+}
+
+.stat strong {
+    display:block;
+    color:#fff;
+    font-size:22px;
+    margin-top:4px;
+}
+
+canvas {
+    display:block;
+    width:100%;
+    height:auto;
+    aspect-ratio:16/9;
+    background:#050914;
+    border:2px solid #36d9ee;
+    cursor:crosshair;
+    touch-action:none;
+}
+
+#info {
+    background:#101c30;
+    padding:10px;
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+    font-size:12px;
+}
+
+#overlay {
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.88);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:20;
+    padding:20px;
+}
+
+#panel {
+    background:#102338;
+    border:2px solid #42eaff;
+    padding:30px;
+    text-align:center;
+    max-width:440px;
+    width:100%;
+    box-shadow:0 0 30px #087c9b;
+}
+
+button {
+    background:#123b53;
+    color:#6df3ff;
+    border:1px solid #48eaff;
+    padding:13px 25px;
+    cursor:pointer;
+    font-family:monospace;
     font-weight:bold;
-    text-align:center;
-    ">
-    {enemy['name']} | HP {enemy['hp']} | DISTANCE {distance}
-    </div>
-    """
+    font-size:16px;
+}
 
-else:
+button:hover {
+    background:#17617c;
+}
 
-    enemy_view = """
-    <div style="
-    position:absolute;
-    top:42%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    color:#54eaff;
-    font-size:20px;
-    z-index:4;
-    text-align:center;
-    ">
-    SCANNING...
-    </div>
-    """
+#message {
+    color:#ffdc75;
+    font-size:14px;
+    min-height:20px;
+}
 
-st.markdown(f"""
-<div class="fps-screen">
-    <div class="fps-ceiling"></div>
-    <div class="fps-floor"></div>
-    <div class="fps-tunnel"></div>
+#controls {
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:12px;
+    padding:12px;
+    color:#9bbaca;
+    font-size:12px;
+}
+</style>
+</head>
 
-    <div class="fps-info">
-        {direction_names[st.session_state.direction]}
-        <br>
-        HOSTILES: {len(st.session_state.enemies)}
-    </div>
+<body>
 
-    {enemy_view}
+<div id="game">
 
-    <div class="fps-crosshair">+</div>
-
-    <div class="fps-gun">🔫</div>
+<div id="hud">
+    <div class="stat">HEALTH<strong id="hp">100</strong></div>
+    <div class="stat">ARMOR<strong id="armor">50</strong></div>
+    <div class="stat">SCORE<strong id="score">0</strong></div>
+    <div class="stat">STAGE<strong id="stage">1</strong></div>
+    <div class="stat">AMMO<strong id="ammo">20</strong></div>
+    <div class="stat">KILLS<strong id="kills">0</strong></div>
 </div>
-""", unsafe_allow_html=True)
 
-if enemy:
-    st.error(f"⚠️ HOSTILE DETECTED: {enemy['name']}")
-else:
-    st.info("주변을 탐색하고 있습니다.")
+<canvas id="screen" width="960" height="540"></canvas>
 
+<div id="info">
+    <span id="status">SYSTEM READY</span>
+    <span id="enemyCount">HOSTILES: 5</span>
+</div>
 
-# ==========================================
-# 17. 컨트롤 패널
-# ==========================================
+<div id="controls">
+    W/S: MOVE |
+    A/D: STRAFE |
+    ←/→: TURN |
+    SPACE: FIRE |
+    R: RELOAD |
+    CLICK SCREEN: MOUSE LOOK
+</div>
 
-st.markdown("---")
-st.subheader("🎮 COMMAND CENTER")
+</div>
 
-left, center, right = st.columns(3)
+<div id="overlay">
+    <div id="panel">
+        <h1>⚡ RETRO STRIKE</h1>
+        <h2>DOOM EDITION</h2>
+        <p>ENTER THE BATTLEFIELD</p>
+        <p>WASD로 이동하고 적을 처치하세요.</p>
+        <button id="start">START MISSION</button>
+    </div>
+</div>
 
-with left:
-    if st.button("↶ TURN LEFT", use_container_width=True):
-        turn_left()
-        st.rerun()
+<script>
 
-with center:
-    if st.button("⬆ MOVE FORWARD", use_container_width=True):
-        move_player(1)
-        st.rerun()
+const canvas = document.getElementById("screen");
+const ctx = canvas.getContext("2d");
 
-with right:
-    if st.button("TURN RIGHT ↷", use_container_width=True):
-        turn_right()
-        st.rerun()
+const W = canvas.width;
+const H = canvas.height;
 
-left, center, right = st.columns(3)
+const map = [
+"111111111111",
+"100000000001",
+"101101001101",
+"100000000001",
+"101001101101",
+"100000000001",
+"101101001101",
+"100000000001",
+"111111111111"
+].map(row => row.split("").map(Number));
 
-with left:
-    if st.button("⬇ MOVE BACK", use_container_width=True):
-        move_player(-1)
-        st.rerun()
+const keys = {};
 
-with center:
-    if st.button("⚡ FIRE", use_container_width=True):
-        shoot()
-        st.rerun()
+let player = {
+    x:1.5,
+    y:1.5,
+    angle:0,
+    hp:100,
+    armor:50,
+    ammo:20,
+    score:0,
+    kills:0,
+    stage:1
+};
 
-with right:
-    if st.button("🔄 RELOAD", use_container_width=True):
-        reload_weapon()
-        st.rerun()
+let enemies = [];
+let running = false;
+let lastTime = 0;
+let shootCooldown = 0;
+let reloadCooldown = 0;
+let damageFlash = 0;
+let muzzleFlash = 0;
+let gameTime = 0;
+let zBuffer = [];
 
+const FOV = Math.PI / 3;
+const MAX_DISTANCE = 14;
 
-# ==========================================
-# 18. 미니맵
-# ==========================================
+function makeEnemies(count) {
 
-st.markdown("---")
-st.subheader("🗺️ TACTICAL RADAR")
+    let result = [];
 
-grid = []
+    for(let i=0;i<count;i++) {
 
-for y in range(9):
+        let x,y;
+        let attempts=0;
 
-    row = []
+        do {
+            x = 2.5 + Math.random()*8;
+            y = 1.5 + Math.random()*6;
 
-    for x in range(9):
+            attempts++;
 
-        symbol = "⬛"
+        } while (
+            (isWall(x,y) ||
+            Math.hypot(x-player.x,y-player.y)<3 ||
+            result.some(e=>Math.hypot(e.x-x,e.y-y)<1))
+            && attempts<100
+        );
 
-        if (x, y) == (
-            st.session_state.px,
-            st.session_state.py
-        ):
-            symbol = "🟢"
+        result.push({
+            x:x,
+            y:y,
+            hp:player.stage>=3?3:2,
+            alive:true,
+            phase:Math.random()*6
+        });
+    }
 
-        elif any(
-            e["x"] == x and e["y"] == y
-            for e in st.session_state.enemies
-        ):
-            symbol = "🔴"
+    return result;
+}
 
-        elif any(
-            i["x"] == x and i["y"] == y
-            for i in st.session_state.items
-        ):
-            symbol = "🟡"
+function isWall(x,y) {
 
-        row.append(symbol)
+    const mx=Math.floor(x);
+    const my=Math.floor(y);
 
-    grid.append(row)
+    if(
+        my<0 || my>=map.length ||
+        mx<0 || mx>=map[0].length
+    ) return true;
 
-for row in grid:
+    return map[my][mx]===1;
+}
 
-    html = '<div class="map-row">'
+function startGame() {
 
-    for cell in row:
-        html += f'<div class="map-cell">{cell}</div>'
+    player={
+        x:1.5,
+        y:1.5,
+        angle:0,
+        hp:100,
+        armor:50,
+        ammo:20,
+        score:0,
+        kills:0,
+        stage:1
+    };
 
-    html += '</div>'
+    enemies=makeEnemies(5);
 
-    st.markdown(html, unsafe_allow_html=True)
+    running=true;
 
-st.caption("🟢 PLAYER | 🔴 ENEMY | 🟡 ITEM")
+    document.getElementById("overlay").style.display="none";
+    document.getElementById("status").textContent="MISSION ACTIVE";
 
+    updateHUD();
 
-# ==========================================
-# 19. 전투 기록
-# ==========================================
+    lastTime=performance.now();
 
-st.markdown("---")
-st.subheader("📋 MISSION LOG")
+    requestAnimationFrame(loop);
+}
 
-st.markdown(
-    f'<div class="log-box">{st.session_state.message}</div>',
-    unsafe_allow_html=True
+document.getElementById("start").onclick=startGame;
+
+// =====================================
+// KEYBOARD INPUT
+// =====================================
+
+document.addEventListener("keydown",e=>{
+
+    const blocked=[
+        "Space","ArrowLeft","ArrowRight",
+        "ArrowUp","ArrowDown"
+    ];
+
+    if(blocked.includes(e.code)) {
+        e.preventDefault();
+    }
+
+    keys[e.code]=true;
+
+    if(e.code==="Space" && !e.repeat) {
+        shoot();
+    }
+
+    if(e.code==="KeyR" && !e.repeat) {
+        reload();
+    }
+});
+
+document.addEventListener("keyup",e=>{
+    keys[e.code]=false;
+});
+
+window.addEventListener("blur",()=>{
+    for(const k in keys) keys[k]=false;
+});
+
+// =====================================
+// MOUSE LOOK
+// =====================================
+
+canvas.addEventListener("click",()=>{
+
+    if(!running) return;
+
+    if(canvas.requestPointerLock) {
+        canvas.requestPointerLock();
+    }
+});
+
+document.addEventListener("mousemove",e=>{
+
+    if(
+        document.pointerLockElement===canvas &&
+        running
+    ) {
+        player.angle+=e.movementX*0.0025;
+    }
+});
+
+// =====================================
+// MOVEMENT
+// =====================================
+
+function move(dx,dy) {
+
+    const radius=0.20;
+
+    if(!isWall(player.x+dx+Math.sign(dx)*radius,player.y)) {
+        player.x+=dx;
+    }
+
+    if(!isWall(player.x,player.y+dy+Math.sign(dy)*radius)) {
+        player.y+=dy;
+    }
+}
+
+function updateMovement(dt) {
+
+    const speed=3.0*dt;
+    const turn=2.2*dt;
+
+    if(keys["ArrowLeft"]) player.angle-=turn;
+    if(keys["ArrowRight"]) player.angle+=turn;
+
+    let forward=0;
+    let strafe=0;
+
+    if(keys["KeyW"]) forward+=speed;
+    if(keys["KeyS"]) forward-=speed;
+    if(keys["KeyA"]) strafe-=speed;
+    if(keys["KeyD"]) strafe+=speed;
+
+    if(forward!==0 || strafe!==0) {
+
+        const length=Math.hypot(forward,strafe);
+
+        forward/=Math.max(1,length/speed);
+        strafe/=Math.max(1,length/speed);
+
+        const dx=
+            Math.cos(player.angle)*forward+
+            Math.cos(player.angle+Math.PI/2)*strafe;
+
+        const dy=
+            Math.sin(player.angle)*forward+
+            Math.sin(player.angle+Math.PI/2)*strafe;
+
+        move(dx,dy);
+    }
+}
+
+// =====================================
+// RAYCASTING ENGINE
+// =====================================
+
+function castRay(angle) {
+
+    const step=0.025;
+
+    let distance=0;
+    let hit=false;
+    let hitX=0;
+    let hitY=0;
+
+    while(distance<MAX_DISTANCE) {
+
+        distance+=step;
+
+        const x=player.x+Math.cos(angle)*distance;
+        const y=player.y+Math.sin(angle)*distance;
+
+        if(isWall(x,y)) {
+            hit=true;
+            hitX=x;
+            hitY=y;
+            break;
+        }
+    }
+
+    return {
+        distance:distance,
+        hit:hit,
+        x:hitX,
+        y:hitY
+    };
+}
+
+function drawWorld() {
+
+    // SKY
+    const sky=ctx.createLinearGradient(0,0,0,H/2);
+    sky.addColorStop(0,"#080e20");
+    sky.addColorStop(1,"#35465a");
+
+    ctx.fillStyle=sky;
+    ctx.fillRect(0,0,W,H/2);
+
+    // FLOOR
+    const floor=ctx.createLinearGradient(0,H/2,0,H);
+    floor.addColorStop(0,"#273746");
+    floor.addColorStop(1,"#070b12");
+
+    ctx.fillStyle=floor;
+    ctx.fillRect(0,H/2,W,H/2);
+
+    zBuffer=[];
+
+    const strips=480;
+    const stripWidth=W/strips;
+
+    for(let i=0;i<strips;i++) {
+
+        const camera=(i/strips)-0.5;
+        const rayAngle=player.angle+camera*FOV;
+
+        const ray=castRay(rayAngle);
+
+        const corrected=
+            ray.distance*Math.cos(rayAngle-player.angle);
+
+        zBuffer[i]=corrected;
+
+        const wallHeight=Math.min(
+            H,
+            H/corrected
+        );
+
+        const y=(H-wallHeight)/2;
+
+        let side=Math.abs(
+            Math.sin(rayAngle)
+        );
+
+        let brightness=Math.max(
+            25,
+            220-corrected*18
+        );
+
+        if(side<0.35) brightness*=0.75;
+
+        const texture=(Math.floor(ray.x*8)+Math.floor(ray.y*8))%2;
+
+        const r=Math.floor(brightness*0.23);
+        const g=Math.floor(brightness*0.62);
+        const b=Math.floor(brightness*(texture?1:0.78));
+
+        ctx.fillStyle=`rgb(${r},${g},${b})`;
+
+        ctx.fillRect(
+            i*stripWidth,
+            y,
+            stripWidth+1,
+            wallHeight
+        );
+
+        if(i%30===0) {
+            ctx.fillStyle="rgba(0,240,255,0.18)";
+            ctx.fillRect(i*stripWidth,y,2,wallHeight);
+        }
+    }
+}
+
+// =====================================
+// ENEMY RENDERING
+// =====================================
+
+function drawEnemies() {
+
+    const visible=enemies
+        .filter(e=>e.alive)
+        .map(e=>{
+
+            let dx=e.x-player.x;
+            let dy=e.y-player.y;
+
+            let distance=Math.hypot(dx,dy);
+
+            let angle=Math.atan2(dy,dx)-player.angle;
+
+            while(angle>Math.PI) angle-=Math.PI*2;
+            while(angle<-Math.PI) angle+=Math.PI*2;
+
+            return {e,distance,angle};
+        })
+        .sort((a,b)=>b.distance-a.distance);
+
+    for(const item of visible) {
+
+        const {e,distance,angle}=item;
+
+        if(Math.abs(angle)>FOV*0.85) continue;
+
+        const corrected=distance*Math.cos(angle);
+
+        if(corrected<0.2) continue;
+
+        const screenX=
+            W/2+(angle/FOV)*W;
+
+        const size=Math.min(
+            260,
+            H/corrected*0.65
+        );
+
+        const column=Math.max(
+            0,
+            Math.min(479,Math.floor(screenX/W*480))
+        );
+
+        if(zBuffer[column]<corrected) continue;
+
+        const y=H/2-size/2+
+            Math.sin(gameTime*3+e.phase)*5;
+
+        ctx.save();
+
+        ctx.shadowColor="#00eeff";
+        ctx.shadowBlur=18;
+
+        ctx.font=`${size*0.75}px serif`;
+        ctx.textAlign="center";
+
+        ctx.fillText(
+            "🤖",
+            screenX,
+            y+size*0.8
+        );
+
+        ctx.restore();
+
+        if(corrected<7) {
+
+            ctx.fillStyle="#25101b";
+            ctx.fillRect(
+                screenX-size*.35,
+                y-13,
+                size*.7,
+                7
+            );
+
+            ctx.fillStyle="#ff425d";
+            ctx.fillRect(
+                screenX-size*.35,
+                y-13,
+                size*.7*(e.hp/(player.stage>=3?3:2)),
+                7
+            );
+        }
+    }
+}
+
+// =====================================
+// WEAPON
+// =====================================
+
+function drawWeapon() {
+
+    const x=W/2;
+    const y=H-35;
+
+    ctx.save();
+
+    if(muzzleFlash>0) {
+
+        ctx.fillStyle="#fff5a3";
+        ctx.shadowColor="#00eaff";
+        ctx.shadowBlur=35;
+
+        ctx.beginPath();
+        ctx.arc(x,y-135,35,0,Math.PI*2);
+        ctx.fill();
+    }
+
+    // Gun body
+    ctx.fillStyle="#101b2c";
+
+    ctx.beginPath();
+    ctx.moveTo(x-75,H);
+    ctx.lineTo(x-35,y-100);
+    ctx.lineTo(x+35,y-100);
+    ctx.lineTo(x+75,H);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle="#38dff5";
+    ctx.lineWidth=3;
+    ctx.stroke();
+
+    ctx.fillStyle="#1e627b";
+    ctx.fillRect(x-13,y-125,26,60);
+
+    ctx.fillStyle="#8ffaff";
+    ctx.fillRect(x-5,y-115,10,25);
+
+    ctx.restore();
+
+    // Crosshair
+    ctx.strokeStyle="#d3ffff";
+    ctx.lineWidth=2;
+
+    ctx.beginPath();
+    ctx.moveTo(x-18,H/2);
+    ctx.lineTo(x-6,H/2);
+
+    ctx.moveTo(x+6,H/2);
+    ctx.lineTo(x+18,H/2);
+
+    ctx.moveTo(x,H/2-18);
+    ctx.lineTo(x,H/2-6);
+
+    ctx.moveTo(x,H/2+6);
+    ctx.lineTo(x,H/2+18);
+
+    ctx.stroke();
+}
+
+// =====================================
+// SHOOTING
+// =====================================
+
+function shoot() {
+
+    if(!running || shootCooldown>0) return;
+
+    if(player.ammo<=0) {
+
+        setMessage("OUT OF AMMO!");
+        return;
+    }
+
+    player.ammo--;
+
+    shootCooldown=0.3;
+    muzzleFlash=0.12;
+
+    let target=null;
+    let best=Infinity;
+
+    for(const e of enemies) {
+
+        if(!e.alive) continue;
+
+        const dx=e.x-player.x;
+        const dy=e.y-player.y;
+
+        const distance=Math.hypot(dx,dy);
+
+        let angle=Math.atan2(dy,dx)-player.angle;
+
+        while(angle>Math.PI) angle-=Math.PI*2;
+        while(angle<-Math.PI) angle+=Math.PI*2;
+
+        if(
+            Math.abs(angle)<0.10 &&
+            distance<best
+        ) {
+
+            const wall=castRay(player.angle);
+
+            if(wall.distance>distance-0.25) {
+                target=e;
+                best=distance;
+            }
+        }
+    }
+
+    if(target) {
+
+        target.hp--;
+
+        if(target.hp<=0) {
+
+            target.alive=false;
+            player.score+=100;
+            player.kills++;
+
+            setMessage("TARGET DESTROYED +100");
+
+        } else {
+
+            player.score+=25;
+            setMessage("ENEMY HIT!");
+        }
+
+    } else {
+
+        setMessage("SHOT MISSED!");
+    }
+
+    if(enemies.every(e=>!e.alive)) {
+        setMessage("STAGE CLEAR!");
+    }
+
+    updateHUD();
+}
+
+// =====================================
+// RELOAD
+// =====================================
+
+function reload() {
+
+    if(!running || reloadCooldown>0) return;
+
+    if(player.ammo===20) return;
+
+    reloadCooldown=0.6;
+    player.ammo=20;
+
+    setMessage("RELOADING COMPLETE");
+
+    updateHUD();
+}
+
+// =====================================
+// ENEMY AI
+// =====================================
+
+function updateEnemies(dt) {
+
+    for(const e of enemies) {
+
+        if(!e.alive) continue;
+
+        const dx=player.x-e.x;
+        const dy=player.y-e.y;
+
+        const distance=Math.hypot(dx,dy);
+
+        if(distance<0.8) {
+
+            e.attackTimer=(e.attackTimer||0)+dt;
+
+            if(e.attackTimer>1.2) {
+
+                e.attackTimer=0;
+
+                const absorbed=Math.min(
+                    player.armor,8
+                );
+
+                player.armor-=absorbed;
+                player.hp-=8-absorbed;
+
+                damageFlash=0.2;
+
+                setMessage("WARNING! UNDER ATTACK");
+
+                if(player.hp<=0) {
+                    player.hp=0;
+                    endGame();
+                }
+            }
+
+        } else if(distance<6) {
+
+            const speed=0.35*dt;
+
+            const nx=e.x+(dx/distance)*speed;
+            const ny=e.y+(dy/distance)*speed;
+
+            if(!isWall(nx,e.y)) e.x=nx;
+            if(!isWall(e.x,ny)) e.y=ny;
+        }
+    }
+}
+
+// =====================================
+// STAGE
+// =====================================
+
+function nextStage() {
+
+    player.stage++;
+
+    player.hp=Math.min(100,player.hp+20);
+    player.armor=Math.min(100,player.armor+20);
+    player.ammo=20;
+
+    player.x=1.5;
+    player.y=1.5;
+    player.angle=0;
+
+    enemies=makeEnemies(
+        Math.min(4+player.stage,10)
+    );
+
+    setMessage("STAGE "+player.stage+" START!");
+    updateHUD();
+}
+
+// =====================================
+// HUD
+// =====================================
+
+function updateHUD() {
+
+    document.getElementById("hp").textContent=player.hp;
+    document.getElementById("armor").textContent=player.armor;
+    document.getElementById("score").textContent=player.score;
+    document.getElementById("stage").textContent=player.stage;
+    document.getElementById("ammo").textContent=player.ammo;
+    document.getElementById("kills").textContent=player.kills;
+
+    document.getElementById("enemyCount").textContent=
+        "HOSTILES: "+enemies.filter(e=>e.alive).length;
+}
+
+function setMessage(msg) {
+    document.getElementById("status").textContent=msg;
+}
+
+// =====================================
+// END GAME
+// =====================================
+
+function endGame() {
+
+    running=false;
+
+    document.exitPointerLock?.();
+
+    document.getElementById("overlay").style.display="flex";
+
+    document.getElementById("panel").innerHTML=`
+        <h1>MISSION FAILED</h1>
+        <h2>FINAL SCORE: ${player.score}</h2>
+        <p>TOTAL KILLS: ${player.kills}</p>
+        <p>STAGE: ${player.stage}</p>
+        <button id="restart">RESTART MISSION</button>
+    `;
+
+    document.getElementById("restart").onclick=startGame;
+}
+
+// =====================================
+// DAMAGE EFFECT
+// =====================================
+
+function drawDamage() {
+
+    if(damageFlash>0) {
+
+        ctx.fillStyle=`rgba(255,0,30,${damageFlash*0.6})`;
+        ctx.fillRect(0,0,W,H);
+    }
+}
+
+// =====================================
+// MAIN LOOP
+// =====================================
+
+function loop(now) {
+
+    if(!running) return;
+
+    const dt=Math.min((now-lastTime)/1000,0.05);
+
+    lastTime=now;
+    gameTime+=dt;
+
+    shootCooldown=Math.max(0,shootCooldown-dt);
+    reloadCooldown=Math.max(0,reloadCooldown-dt);
+    muzzleFlash=Math.max(0,muzzleFlash-dt);
+    damageFlash=Math.max(0,damageFlash-dt);
+
+    updateMovement(dt);
+    updateEnemies(dt);
+
+    drawWorld();
+    drawEnemies();
+    drawWeapon();
+    drawDamage();
+
+    if(player.hp<=0) {
+        endGame();
+        return;
+    }
+
+    if(enemies.every(e=>!e.alive)) {
+
+        if(!window.stageCleared) {
+
+            window.stageCleared=true;
+
+            setMessage("STAGE CLEAR! PRESS ENTER");
+
+        }
+
+        if(keys["Enter"]) {
+
+            window.stageCleared=false;
+            keys["Enter"]=false;
+
+            nextStage();
+        }
+
+    } else {
+        window.stageCleared=false;
+    }
+
+    updateHUD();
+
+    requestAnimationFrame(loop);
+}
+
+// =====================================
+// INITIAL PREVIEW
+// =====================================
+
+ctx.fillStyle="#080e20";
+ctx.fillRect(0,0,W,H);
+
+ctx.fillStyle="#48eaff";
+ctx.font="bold 35px monospace";
+ctx.textAlign="center";
+ctx.fillText("RETRO STRIKE 3.0",W/2,H/2);
+
+</script>
+
+</body>
+</html>
+"""
+
+# ======================================
+# 4. 초기 적 데이터 전달
+# ======================================
+
+html = html.replace(
+    "const initialEnemyData = [];",
+    "const initialEnemyData = " + game_data + ";"
 )
 
-for log in st.session_state.log[-5:]:
-    st.markdown(
-        f'<div class="log-box">{log}</div>',
-        unsafe_allow_html=True
-    )
+# ======================================
+# 5. 게임 출력
+# ======================================
 
-
-# ==========================================
-# 20. 스테이지 및 게임 종료
-# ==========================================
-
-if st.session_state.game_over:
-
-    st.error("💀 MISSION FAILED")
-
-    st.markdown(f"""
-    ## FINAL RESULT
-
-    - SCORE: {st.session_state.score}
-    - TOTAL KILLS: {st.session_state.kills}
-    - STAGE REACHED: {st.session_state.stage}
-    """)
-
-    if st.button("🔄 RESTART GAME", use_container_width=True):
-        initialize()
-        st.rerun()
-
-elif len(st.session_state.enemies) == 0:
-
-    st.success("🏆 STAGE CLEAR!")
-
-    st.write(
-        f"현재 스테이지 {st.session_state.stage} 클리어!"
-    )
-
-    if st.button("🚀 NEXT STAGE", use_container_width=True):
-        next_stage()
-        st.rerun()
-
-
-# ==========================================
-# 21. 게임 재시작
-# ==========================================
+components.html(
+    html,
+    height=720,
+    scrolling=False
+)
 
 st.markdown("---")
-
-if st.button("⏹ RESET GAME", use_container_width=True):
-
-    st.session_state.started = False
-    st.rerun()
-
-st.caption("RETRO STRIKE 2.0 | SURVIVAL SYSTEM")
+st.caption(
+    "RETRO STRIKE 3.0 | PYTHON + STREAMLIT + JAVASCRIPT"
+)
