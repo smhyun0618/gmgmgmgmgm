@@ -1,254 +1,373 @@
+
 import streamlit as st
 import random
-import time
 
+# -----------------------------
+# 1. 기본 설정
+# -----------------------------
 st.set_page_config(
-    page_title="TACTICAL STRIKE FPS",
-    page_icon="🎯",
+    page_title="RETRO STRIKE",
+    page_icon="🎮",
     layout="wide"
 )
 
-# =========================
-# 게임 설정
-# =========================
-
-if "health" not in st.session_state:
-    st.session_state.health = 100
-    st.session_state.ammo = 30
+# -----------------------------
+# 2. 게임 데이터 초기화
+# -----------------------------
+def new_game():
+    st.session_state.hp = 100
     st.session_state.score = 0
+    st.session_state.stage = 1
     st.session_state.kills = 0
-    st.session_state.wave = 1
-    st.session_state.enemy_health = 100
+    st.session_state.direction = 0
+    st.session_state.player_x = 4
+    st.session_state.player_y = 4
     st.session_state.game_over = False
-    st.session_state.reload = False
-    st.session_state.log = ["작전 시작! 적을 제거하세요."]
+    st.session_state.enemies = []
+    st.session_state.started = True
+    create_enemies()
 
-# =========================
-# 스타일
-# =========================
+# 적 생성 함수
+def create_enemies():
+    st.session_state.enemies = []
 
-st.markdown("""
-<style>
-.stApp {
-    background: linear-gradient(135deg, #080d12, #101e25, #071016);
-    color: #e5f4f2;
-}
-h1 {
-    color: #00ffc3 !important;
-    text-shadow: 0 0 15px #00ffc3;
-}
-h2, h3 {
-    color: #b7fff0 !important;
-}
-[data-testid="stMetric"] {
-    background: #14252b;
-    border: 1px solid #00ffc355;
-    border-radius: 12px;
-    padding: 15px;
-}
-.stButton button {
-    width: 100%;
-    background: linear-gradient(90deg, #008f70, #00d6a5);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-weight: bold;
-    min-height: 48px;
-}
-.stButton button:hover {
-    background: #00ffc3;
-    color: black;
-    box-shadow: 0 0 20px #00ffc3;
-}
-</style>
-""", unsafe_allow_html=True)
+    # 스테이지가 높아질수록 적 증가
+    enemy_count = 2 + st.session_state.stage
 
-# =========================
-# 헤더
-# =========================
+    while len(st.session_state.enemies) < enemy_count:
+        x = random.randint(0, 8)
+        y = random.randint(0, 8)
 
-st.title("🎯 TACTICAL STRIKE")
-st.caption("ELITE FPS COMBAT SIMULATOR | VERSION 1.0")
+        if (x, y) != (
+            st.session_state.player_x,
+            st.session_state.player_y
+        ) and (x, y) not in st.session_state.enemies:
+            st.session_state.enemies.append((x, y))
 
-if st.session_state.game_over:
-    st.error("☠️ MISSION FAILED - 작전 실패")
-    if st.button("🔄 다시 시작"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.rerun()
-    st.stop()
+# -----------------------------
+# 3. 방향 및 이동 함수
+# -----------------------------
+# 북쪽, 동쪽, 남쪽, 서쪽
+directions = [
+    (0, -1),
+    (1, 0),
+    (0, 1),
+    (-1, 0)
+]
 
-# =========================
-# 상태 표시
-# =========================
+def turn_left():
+    st.session_state.direction = (
+        st.session_state.direction - 1
+    ) % 4
 
-c1, c2, c3, c4 = st.columns(4)
+def turn_right():
+    st.session_state.direction = (
+        st.session_state.direction + 1
+    ) % 4
 
-c1.metric("❤️ 체력", f"{st.session_state.health}%")
-c2.metric("🔫 탄약", f"{st.session_state.ammo}/30")
-c3.metric("💀 처치", st.session_state.kills)
-c4.metric("🌊 웨이브", st.session_state.wave)
+def move_player(distance):
+    dx, dy = directions[st.session_state.direction]
 
-st.progress(st.session_state.health / 100)
+    new_x = st.session_state.player_x + dx * distance
+    new_y = st.session_state.player_y + dy * distance
 
-st.divider()
+    if 0 <= new_x <= 8 and 0 <= new_y <= 8:
+        st.session_state.player_x = new_x
+        st.session_state.player_y = new_y
 
-# =========================
-# 전장
-# =========================
+    enemy_turn()
 
-st.subheader("🏙️ BATTLEFIELD")
+# -----------------------------
+# 4. 적의 행동
+# -----------------------------
+def enemy_turn():
 
-st.markdown("""
-<div style="
-background:linear-gradient(#182b34,#101820);
-height:260px;
-border:2px solid #00ffc355;
-border-radius:15px;
-display:flex;
-flex-direction:column;
-align-items:center;
-justify-content:center;
-position:relative;
-overflow:hidden;
-">
-<div style="font-size:65px;">🏙️ 🌫️ 🏢</div>
-<div style="font-size:50px;">🎯</div>
-<div style="color:#00ffc3;font-size:20px;font-weight:bold;">
-TACTICAL COMBAT ZONE
-</div>
-<div style="color:#8ba9a6;font-size:13px;">
-ENEMY DETECTED
-</div>
-</div>
-""", unsafe_allow_html=True)
-
-st.subheader("👾 적군 정보")
-
-st.write(f"적군 체력: {st.session_state.enemy_health}%")
-st.progress(st.session_state.enemy_health / 100)
-
-# =========================
-# 게임 기능
-# =========================
-
-def attack():
-    if st.session_state.ammo <= 0:
-        st.session_state.log.insert(0, "⚠️ 탄약이 없습니다!")
+    if st.session_state.game_over:
         return
 
-    st.session_state.ammo -= 1
+    new_enemies = []
 
-    damage = random.randint(15, 35)
-    st.session_state.enemy_health -= damage
+    for enemy in st.session_state.enemies:
 
-    if st.session_state.enemy_health <= 0:
-        st.session_state.enemy_health = 0
-        st.session_state.kills += 1
+        x, y = enemy
+
+        # 플레이어와 인접하면 공격
+        px = st.session_state.player_x
+        py = st.session_state.player_y
+
+        distance = abs(px - x) + abs(py - y)
+
+        if distance <= 1:
+            st.session_state.hp -= 10
+            new_enemies.append(enemy)
+
+        else:
+            # 적이 무작위로 이동
+            dx, dy = random.choice(directions)
+
+            nx = x + dx
+            ny = y + dy
+
+            if (
+                0 <= nx <= 8
+                and 0 <= ny <= 8
+                and (nx, ny) != (px, py)
+                and (nx, ny) not in new_enemies
+            ):
+                new_enemies.append((nx, ny))
+            else:
+                new_enemies.append(enemy)
+
+    st.session_state.enemies = new_enemies
+
+    if st.session_state.hp <= 0:
+        st.session_state.hp = 0
+        st.session_state.game_over = True
+
+# -----------------------------
+# 5. 공격 함수
+# -----------------------------
+def shoot():
+
+    if st.session_state.game_over:
+        return
+
+    dx, dy = directions[st.session_state.direction]
+
+    px = st.session_state.player_x
+    py = st.session_state.player_y
+
+    target = None
+
+    # 정면 최대 4칸까지 공격
+    for distance in range(1, 5):
+
+        tx = px + dx * distance
+        ty = py + dy * distance
+
+        if (tx, ty) in st.session_state.enemies:
+            target = (tx, ty)
+            break
+
+    if target is not None:
+
+        st.session_state.enemies.remove(target)
         st.session_state.score += 100
-        st.session_state.wave += 1
-        st.session_state.enemy_health = random.randint(70, 130)
-        st.session_state.ammo = min(30, st.session_state.ammo + 10)
-        st.session_state.log.insert(0, "💀 적 처치! 다음 웨이브 시작!")
+        st.session_state.kills += 1
+
+        st.session_state.message = "🎯 TARGET DESTROYED! +100"
+
     else:
-        st.session_state.log.insert(
-            0, f"🎯 명중! {damage} 데미지!"
-        )
+        st.session_state.message = "❌ MISS! TARGET NOT FOUND"
 
-    # 적의 반격
-    if random.random() < 0.3:
-        damage = random.randint(5, 15)
-        st.session_state.health -= damage
-        st.session_state.log.insert(
-            0, f"💥 적의 공격! 체력 -{damage}"
-        )
+    enemy_turn()
 
-    if st.session_state.health <= 0:
-        st.session_state.health = 0
-        st.session_state.game_over = True
+# -----------------------------
+# 6. 다음 스테이지
+# -----------------------------
+def next_stage():
 
+    st.session_state.stage += 1
+    st.session_state.hp = min(
+        100,
+        st.session_state.hp + 20
+    )
 
-def reload_weapon():
-    st.session_state.ammo = 30
-    st.session_state.log.insert(0, "🔄 재장전 완료!")
+    create_enemies()
 
+    st.session_state.message = "🚀 NEXT STAGE START!"
 
-def dodge():
-    if random.random() < 0.75:
-        st.session_state.log.insert(0, "💨 회피 성공!")
-    else:
-        damage = random.randint(5, 15)
-        st.session_state.health -= damage
-        st.session_state.log.insert(0, f"💥 회피 실패! 체력 -{damage}")
+# -----------------------------
+# 7. 게임 제목
+# -----------------------------
+st.markdown("""
+# 🎮 RETRO STRIKE
+### ⚡ SPACE ARENA : FPS SURVIVAL
+적 드론을 찾아 공격하고 모든 스테이지를 클리어하라!
+""")
 
-    if st.session_state.health <= 0:
-        st.session_state.health = 0
-        st.session_state.game_over = True
+# -----------------------------
+# 8. 게임 시작
+# -----------------------------
+if "started" not in st.session_state:
+    st.session_state.started = False
 
+if not st.session_state.started:
+    st.info("게임을 시작하려면 아래 버튼을 눌러 주세요.")
 
-# =========================
-# 조작 버튼
-# =========================
+    if st.button("▶ START GAME", use_container_width=True):
+        new_game()
+        st.rerun()
 
-st.subheader("🎮 COMBAT CONTROL")
+    st.stop()
+
+# -----------------------------
+# 9. 상태 표시
+# -----------------------------
+st.markdown("---")
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("❤️ HP", st.session_state.hp)
+col2.metric("🏆 SCORE", st.session_state.score)
+col3.metric("🚀 STAGE", st.session_state.stage)
+col4.metric("🎯 KILLS", st.session_state.kills)
+
+st.markdown("---")
+
+# -----------------------------
+# 10. 게임 화면
+# -----------------------------
+st.subheader("🖥️ FIRST PERSON VIEW")
+
+# 방향에 따른 시야 표현
+view_names = ["NORTH ⬆️", "EAST ➡️", "SOUTH ⬇️", "WEST ⬅️"]
+
+st.markdown(
+    f"**현재 방향: {view_names[st.session_state.direction]}**"
+)
+
+# 앞에 적이 있는지 확인
+dx, dy = directions[st.session_state.direction]
+
+px = st.session_state.player_x
+py = st.session_state.player_y
+
+visible_enemy = None
+
+for distance in range(1, 5):
+    check = (
+        px + dx * distance,
+        py + dy * distance
+    )
+
+    if check in st.session_state.enemies:
+        visible_enemy = distance
+        break
+
+if visible_enemy is not None:
+    st.error(f"⚠️ 적 발견! 정면 {visible_enemy}칸 거리에 적이 있습니다!")
+else:
+    st.success("주변을 탐색 중입니다. 적을 찾아보세요.")
+
+# FPS 스타일 화면
+if visible_enemy is not None:
+    st.markdown("""
+    <div style="
+    background:linear-gradient(#101629,#273d50);
+    border:3px solid #31d9ef;
+    border-radius:10px;
+    padding:45px;
+    text-align:center;
+    color:white;
+    ">
+    <h2>⚠️ ENEMY DETECTED</h2>
+    <div style="font-size:90px;">🤖</div>
+    <h3>HOSTILE DRONE</h3>
+    <p>READY TO FIRE</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+else:
+    st.markdown("""
+    <div style="
+    background:linear-gradient(#101629,#273d50);
+    border:3px solid #31d9ef;
+    border-radius:10px;
+    padding:45px;
+    text-align:center;
+    color:white;
+    ">
+    <h2>SPACE ARENA</h2>
+    <div style="font-size:90px;">🔭</div>
+    <h3>SCANNING AREA...</h3>
+    <p>SEARCHING FOR ENEMIES</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# -----------------------------
+# 11. 조작 버튼
+# -----------------------------
+st.subheader("🎮 CONTROL PANEL")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    if st.button("🔫 발사"):
-        attack()
+    if st.button("⬅️ TURN LEFT", use_container_width=True):
+        turn_left()
         st.rerun()
 
 with col2:
-    if st.button("🔄 재장전"):
-        reload_weapon()
+    if st.button("⬆️ MOVE FORWARD", use_container_width=True):
+        move_player(1)
         st.rerun()
 
 with col3:
-    if st.button("💨 회피"):
-        dodge()
+    if st.button("➡️ TURN RIGHT", use_container_width=True):
+        turn_right()
         st.rerun()
 
-# =========================
-# 점수
-# =========================
+col4, col5 = st.columns(2)
 
-st.divider()
+with col4:
+    if st.button("⬇️ MOVE BACKWARD", use_container_width=True):
+        move_player(-1)
+        st.rerun()
 
-st.subheader("🏆 PLAYER SCORE")
+with col5:
+    if st.button("⚡ FIRE / SPACE", use_container_width=True):
+        shoot()
+        st.rerun()
 
-st.markdown(f"""
-<div style="
-background:#14252b;
-padding:20px;
-border-radius:12px;
-border:1px solid #00ffc355;
-text-align:center;
-">
-<div style="color:#8ba9a6;">TOTAL SCORE</div>
-<div style="font-size:42px;color:#00ffc3;font-weight:bold;">
-{st.session_state.score:,}
-</div>
-</div>
-""", unsafe_allow_html=True)
+# -----------------------------
+# 12. 게임 결과
+# -----------------------------
+if "message" in st.session_state:
+    st.info(st.session_state.message)
 
-# =========================
-# 전투 로그
-# =========================
+if st.session_state.game_over:
 
-st.subheader("📡 COMBAT LOG")
+    st.error("💀 GAME OVER")
 
-for message in st.session_state.log[:8]:
-    st.write(message)
+    st.write(f"최종 점수: {st.session_state.score}")
+    st.write(f"처치한 적: {st.session_state.kills}")
 
-# =========================
-# 게임 종료
-# =========================
+    if st.button("🔄 RESTART GAME"):
+        new_game()
+        st.rerun()
 
-st.divider()
+elif len(st.session_state.enemies) == 0:
 
-if st.button("🏳️ 작전 포기"):
-    st.session_state.game_over = True
-    st.rerun()
+    st.success("🏆 STAGE CLEAR!")
 
-st.caption("TACTICAL STRIKE © 2026 | TRAINING SIMULATOR")
+    if st.button("NEXT STAGE 🚀"):
+        next_stage()
+        st.rerun()
+
+# -----------------------------
+# 13. 미니맵
+# -----------------------------
+st.markdown("---")
+st.subheader("🗺️ RADAR MAP")
+
+for y in range(9):
+
+    line = ""
+
+    for x in range(9):
+
+        if (x, y) == (
+            st.session_state.player_x,
+            st.session_state.player_y
+        ):
+            line += "🟢 "
+
+        elif (x, y) in st.session_state.enemies:
+            line += "🔴 "
+
+        else:
+            line += "⬛ "
+
+    st.markdown(line)
+
+st.caption("🟢 PLAYER  🔴 ENEMY  ⬛ EMPTY")
