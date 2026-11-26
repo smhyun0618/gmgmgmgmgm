@@ -50,26 +50,29 @@ ENEMY_TYPES = [
         "name": "GHOST",
         "color": "#bb66ff",
         "hp": 1,
-        "speed": 1.0,
+        "speed": 0.9,
         "size": 0.7
     }
 ]
 
-# Python 함수와 리스트 활용
+# 시작 위치에서 멀리 떨어진 적 생성 위치
+ENEMY_POSITIONS = [
+    (8.5, 1.5),
+    (9.5, 3.5),
+    (8.5, 6.5),
+    (5.5, 8.5),
+    (9.5, 8.5),
+    (1.5, 6.5),
+    (5.5, 3.5),
+    (2.5, 8.5),
+    (10.5, 5.5)
+]
+
+# Python 리스트와 반복문 활용
 def create_enemies(stage):
     enemies = []
-
-    positions = [
-        (3.5, 1.5),
-        (5.5, 1.5),
-        (8.5, 1.5),
-        (3.5, 3.5),
-        (8.5, 3.5),
-        (3.5, 6.5),
-        (8.5, 6.5),
-        (5.5, 8.5),
-        (8.5, 8.5)
-    ]
+    positions = ENEMY_POSITIONS.copy()
+    random.shuffle(positions)
 
     count = min(4 + stage * 2, len(positions))
 
@@ -179,6 +182,9 @@ canvas {
     cursor: pointer;
 }
 
+#overlay button:hover {
+    background: white;
+}
 </style>
 </head>
 
@@ -194,19 +200,24 @@ canvas {
 
 <div id="gameBox">
 
-<canvas id="game" width="800" height="450" tabindex="0"></canvas>
+    <canvas id="game"
+        width="800"
+        height="450"
+        tabindex="0">
+    </canvas>
 
-<div id="overlay">
-    <h1>RETRO STRIKE</h1>
-    <p>
-        MISSION START<br>
-        적을 모두 처치하고 다음 구역으로 이동하라.<br><br>
-        WASD : 이동<br>
-        ← → : 시야 회전<br>
-        SPACE : 발사
-    </p>
-    <button id="startButton">START MISSION</button>
-</div>
+    <div id="overlay">
+        <h1>RETRO STRIKE</h1>
+        <p>
+            MISSION START<br>
+            적을 모두 처치하고 다음 구역으로 이동하라.<br><br>
+            WASD : 이동<br>
+            ← → : 시야 회전<br>
+            SPACE : 발사<br>
+            R : 재장전
+        </p>
+        <button id="startButton">START MISSION</button>
+    </div>
 
 </div>
 
@@ -224,6 +235,7 @@ const H = canvas.height;
 
 const initialEnemyData = __ENEMIES__;
 
+// 맵
 const map = [
     "############",
     "#..........#",
@@ -241,7 +253,7 @@ const FOV = Math.PI / 3;
 const RAYS = 400;
 const MAX_DEPTH = 12;
 
-let player;
+let player = null;
 let enemies = [];
 let keys = {};
 
@@ -249,7 +261,7 @@ let score = 0;
 let stage = 1;
 let hp = 100;
 let ammo = 20;
-let maxAmmo = 20;
+const maxAmmo = 20;
 
 let gameRunning = false;
 let gameOver = false;
@@ -266,9 +278,12 @@ let lastTime = 0;
 let animationId = null;
 let zBuffer = [];
 
+// 게임 시작
 function startGame() {
-    if (animationId) {
+
+    if (animationId !== null) {
         cancelAnimationFrame(animationId);
+        animationId = null;
     }
 
     player = {
@@ -297,8 +312,8 @@ function startGame() {
     damageFlash = 0;
     shootCooldown = 0;
     reloadTime = 0;
-    lastTime = 0;
 
+    lastTime = 0;
     keys = {};
 
     document.getElementById("overlay").style.display = "none";
@@ -306,6 +321,7 @@ function startGame() {
     canvas.focus();
 
     updateHUD();
+
     animationId = requestAnimationFrame(loop);
 }
 
@@ -314,7 +330,9 @@ document.getElementById("startButton").addEventListener(
     startGame
 );
 
+// 벽 확인
 function isWall(x, y) {
+
     const mx = Math.floor(x);
     const my = Math.floor(y);
 
@@ -330,7 +348,9 @@ function isWall(x, y) {
     return map[my][mx] === "#";
 }
 
+// 이동 가능 여부
 function canMove(x, y) {
+
     const r = 0.18;
 
     return (
@@ -341,15 +361,25 @@ function canMove(x, y) {
     );
 }
 
+// 각도 정리
 function normalizeAngle(a) {
-    while (a > Math.PI) a -= Math.PI * 2;
-    while (a < -Math.PI) a += Math.PI * 2;
+
+    while (a > Math.PI) {
+        a -= Math.PI * 2;
+    }
+
+    while (a < -Math.PI) {
+        a += Math.PI * 2;
+    }
 
     return a;
 }
 
+// 광선으로 벽 거리 확인
 function castRay(angle) {
+
     for (let d = 0.02; d < MAX_DEPTH; d += 0.025) {
+
         const x = player.x + Math.cos(angle) * d;
         const y = player.y + Math.sin(angle) * d;
 
@@ -363,6 +393,7 @@ function castRay(angle) {
 
 // 플레이어 이동
 function movePlayer(dt) {
+
     const moveSpeed = 2.5 * dt;
     const turnSpeed = 2.0 * dt;
 
@@ -401,8 +432,9 @@ function movePlayer(dt) {
     }
 }
 
-// 배경과 벽
+// 배경과 벽 그리기
 function drawWorld() {
+
     const sky = ctx.createLinearGradient(0, 0, 0, H/2);
 
     sky.addColorStop(0, "#080d20");
@@ -422,6 +454,7 @@ function drawWorld() {
     zBuffer = [];
 
     for (let i = 0; i < RAYS; i++) {
+
         const angle =
             player.angle - FOV/2 + FOV * i/RAYS;
 
@@ -463,11 +496,14 @@ function drawWorld() {
 
 // 적의 생김새
 function drawEnemyShape(enemy, x, y, size) {
+
     ctx.save();
+
     ctx.translate(x, y);
     ctx.scale(size/55, size/55);
 
     if (enemy.type === "alien") {
+
         // 초록 외계인
         ctx.fillStyle = "#39ff14";
 
@@ -489,6 +525,7 @@ function drawEnemyShape(enemy, x, y, size) {
         ctx.fillRect(8, 20, 12, 20);
 
     } else if (enemy.type === "robot") {
+
         // 빨간 로봇
         ctx.fillStyle = "#555b65";
         ctx.fillRect(-22, -35, 44, 60);
@@ -509,6 +546,7 @@ function drawEnemyShape(enemy, x, y, size) {
         ctx.fillRect(4, 27, 13, 17);
 
     } else {
+
         // 보라색 유령
         ctx.fillStyle = "#bb66ff";
 
@@ -536,9 +574,11 @@ function drawEnemyShape(enemy, x, y, size) {
 
 // 적 화면에 표시
 function drawEnemies() {
+
     const visible = [];
 
     for (const enemy of enemies) {
+
         const dx = enemy.x-player.x;
         const dy = enemy.y-player.y;
 
@@ -550,9 +590,9 @@ function drawEnemies() {
 
         if (Math.abs(angle) < FOV/2 + 0.2) {
             visible.push({
-                enemy,
-                dist,
-                angle
+                enemy: enemy,
+                dist: dist,
+                angle: angle
             });
         }
     }
@@ -560,6 +600,7 @@ function drawEnemies() {
     visible.sort((a,b) => b.dist-a.dist);
 
     for (const item of visible) {
+
         const enemy = item.enemy;
         const dist = item.dist;
         const angle = item.angle;
@@ -585,7 +626,7 @@ function drawEnemies() {
             size
         );
 
-        // 체력 표시
+        // 적 체력 표시
         const barWidth = size*0.7;
         const barX = screenX-barWidth/2;
         const barY = screenY-size*0.75;
@@ -604,10 +645,10 @@ function drawEnemies() {
     }
 }
 
-// 총 모양과 발사 애니메이션
+// 총 그리기
 function drawGun() {
-    const cx = W/2;
 
+    const cx = W/2;
     const recoil = muzzleFlash > 0 ? 8 : 0;
 
     ctx.fillStyle = "#151a22";
@@ -624,6 +665,7 @@ function drawGun() {
 
     // 총구 섬광
     if (muzzleFlash > 0) {
+
         ctx.fillStyle =
             muzzleFlash % 2 === 0 ? "#fff36a" : "#ff7b19";
 
@@ -640,6 +682,7 @@ function drawGun() {
 
     // 탄환 궤적
     if (bulletFrames > 0) {
+
         ctx.strokeStyle = "#fff46a";
         ctx.lineWidth = 5;
 
@@ -657,6 +700,7 @@ function drawGun() {
 
 // 조준점
 function drawCrosshair() {
+
     const cx = W/2;
     const cy = H/2;
 
@@ -680,6 +724,7 @@ function drawCrosshair() {
     ctx.stroke();
 
     if (hitMarker > 0) {
+
         ctx.strokeStyle = "#ff4444";
         ctx.lineWidth = 4;
 
@@ -697,10 +742,12 @@ function drawCrosshair() {
 
 // 조준한 적 확인
 function getTargetEnemy() {
+
     let target = null;
     let closest = Infinity;
 
     for (const enemy of enemies) {
+
         const dx = enemy.x-player.x;
         const dy = enemy.y-player.y;
 
@@ -711,6 +758,7 @@ function getTargetEnemy() {
         );
 
         if (Math.abs(angle) < 0.10 && dist < closest) {
+
             const wallDistance = castRay(player.angle);
 
             if (wallDistance > dist-0.2) {
@@ -723,8 +771,9 @@ function getTargetEnemy() {
     return target;
 }
 
-// 총 발사
+// 발사
 function shoot() {
+
     if (!gameRunning || gameOver || stageCleared) return;
     if (ammo <= 0 || shootCooldown > 0) return;
 
@@ -737,10 +786,12 @@ function shoot() {
     const target = getTargetEnemy();
 
     if (target) {
+
         target.hp--;
         hitMarker = 8;
 
         if (target.hp <= 0) {
+
             score += target.type === "robot" ? 200 : 100;
 
             enemies = enemies.filter(
@@ -754,26 +805,20 @@ function shoot() {
 
 // 재장전
 function reload() {
+
+    if (!gameRunning) return;
     if (ammo === maxAmmo || reloadTime > 0) return;
 
     reloadTime = 1.2;
-
-    setTimeout(() => {
-        if (gameRunning && !gameOver) {
-            ammo = maxAmmo;
-            reloadTime = 0;
-            updateHUD();
-        }
-    }, 1200);
 }
 
 // 적 생성
 function makeEnemies(count) {
+
     const types = [
         {
             type: "alien",
             name: "ALIEN",
-            color: "#39ff14",
             hp: 1,
             maxHp: 1,
             speed: 0.65,
@@ -782,7 +827,6 @@ function makeEnemies(count) {
         {
             type: "robot",
             name: "ROBOT",
-            color: "#ff3333",
             hp: 3,
             maxHp: 3,
             speed: 0.35,
@@ -791,30 +835,38 @@ function makeEnemies(count) {
         {
             type: "ghost",
             name: "GHOST",
-            color: "#bb66ff",
             hp: 1,
             maxHp: 1,
-            speed: 1.0,
+            speed: 0.9,
             size: 0.7
         }
     ];
 
+    // 시작 지점과 멀리 떨어진 위치만 사용
     const positions = [
-        [3.5,1.5],
-        [5.5,1.5],
         [8.5,1.5],
-        [3.5,3.5],
-        [8.5,3.5],
-        [3.5,6.5],
+        [9.5,3.5],
         [8.5,6.5],
         [5.5,8.5],
-        [8.5,8.5]
+        [9.5,8.5],
+        [1.5,6.5],
+        [5.5,3.5],
+        [2.5,8.5],
+        [10.5,5.5]
     ];
+
+    // 위치 섞기
+    for (let i = positions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
 
     const result = [];
 
-    for (let i=0; i<count; i++) {
-        const pos = positions[i % positions.length];
+    for (let i = 0; i < count && i < positions.length; i++) {
+
+        const pos = positions[i];
+
         const type = types[
             Math.floor(Math.random()*types.length)
         ];
@@ -832,13 +884,16 @@ function makeEnemies(count) {
 
 // 적 움직임
 function updateEnemies(dt) {
+
     for (const enemy of enemies) {
+
         const dx = player.x-enemy.x;
         const dy = player.y-enemy.y;
 
         const dist = Math.hypot(dx,dy);
 
         if (dist > 0.7) {
+
             const speed =
                 enemy.speed*(1+stage*0.08);
 
@@ -857,6 +912,7 @@ function updateEnemies(dt) {
             }
 
         } else {
+
             const now = performance.now();
 
             if (
@@ -872,8 +928,9 @@ function updateEnemies(dt) {
     }
 }
 
-// 화면 정보
+// HUD 갱신
 function updateHUD() {
+
     document.getElementById("hp").textContent =
         "HP: "+Math.max(0,hp);
 
@@ -890,8 +947,9 @@ function updateHUD() {
         "ENEMIES: "+enemies.length;
 }
 
-// 화면 메시지
+// 안내 화면
 function showOverlay(title,message,buttonText,callback) {
+
     const overlay = document.getElementById("overlay");
 
     overlay.innerHTML = `
@@ -902,12 +960,25 @@ function showOverlay(title,message,buttonText,callback) {
 
     overlay.style.display = "flex";
 
-    document.getElementById("overlayButton").onclick =
-        callback;
+    document.getElementById("overlayButton").onclick = callback;
 }
 
 // 다음 스테이지
- hp = Math.min(100, hp + 20);
+function nextStage() {
+
+    // 클리어 상태가 아니면 실행하지 않음
+    if (!stageCleared || gameRunning) return;
+
+    // 이전 화면 숨기기
+    document.getElementById("overlay").style.display = "none";
+
+    stage++;
+
+    player.x = 1.5;
+    player.y = 1.5;
+    player.angle = 0;
+
+    hp = Math.min(100, hp + 20);
     ammo = maxAmmo;
 
     enemies = makeEnemies(
@@ -919,17 +990,21 @@ function showOverlay(title,message,buttonText,callback) {
     gameRunning = true;
 
     lastTime = 0;
+    keys = {};
 
     updateHUD();
 
     canvas.focus();
 
-    // 새로운 게임 루프 시작
+    // 게임 루프 한 번만 시작
     animationId = requestAnimationFrame(loop);
 }
 
 // 스테이지 클리어
 function clearStage() {
+
+    if (stageCleared || gameOver) return;
+
     gameRunning = false;
     stageCleared = true;
 
@@ -943,6 +1018,9 @@ function clearStage() {
 
 // 게임 오버
 function endGame() {
+
+    if (gameOver) return;
+
     gameRunning = false;
     gameOver = true;
 
@@ -955,8 +1033,9 @@ function endGame() {
     );
 }
 
-// 효과 시간 감소
+// 효과 시간 갱신
 function updateEffects(dt) {
+
     if (muzzleFlash > 0) muzzleFlash--;
     if (bulletFrames > 0) bulletFrames--;
     if (hitMarker > 0) hitMarker--;
@@ -965,23 +1044,39 @@ function updateEffects(dt) {
     if (shootCooldown > 0) {
         shootCooldown -= dt;
     }
+
+    // 재장전 시간 계산
+    if (reloadTime > 0) {
+
+        reloadTime -= dt;
+
+        if (reloadTime <= 0) {
+            ammo = maxAmmo;
+            reloadTime = 0;
+            updateHUD();
+        }
+    }
 }
 
 // 화면 그리기
 function render() {
+
     drawWorld();
     drawEnemies();
     drawCrosshair();
     drawGun();
 
     if (damageFlash > 0) {
+
         ctx.fillStyle = "rgba(255,0,0,0.22)";
         ctx.fillRect(0,0,W,H);
     }
 
     if (reloadTime > 0) {
+
         ctx.fillStyle = "#ffff66";
         ctx.font = "20px monospace";
+
         ctx.fillText(
             "RELOADING...",
             W/2-65,
@@ -990,9 +1085,13 @@ function render() {
     }
 }
 
-// 메인 게임 반복
+// 게임 반복 실행
 function loop(timestamp) {
-    if (!gameRunning) return;
+
+    if (!gameRunning) {
+        animationId = null;
+        return;
+    }
 
     const dt = Math.min(
         (timestamp-(lastTime || timestamp))/1000,
@@ -1009,11 +1108,13 @@ function loop(timestamp) {
 
     if (hp <= 0) {
         endGame();
+        animationId = null;
         return;
     }
 
     if (enemies.length === 0) {
         clearStage();
+        animationId = null;
         return;
     }
 
@@ -1022,6 +1123,7 @@ function loop(timestamp) {
 
 // 키보드 입력
 document.addEventListener("keydown", e => {
+
     const key = e.key.toLowerCase();
 
     if (
@@ -1046,14 +1148,17 @@ document.addEventListener("keyup", e => {
     keys[e.key.toLowerCase()] = false;
 });
 
+// 창을 벗어나면 이동키 초기화
 window.addEventListener("blur", () => {
     keys = {};
 });
 
+// 캔버스 클릭 시 키보드 입력 준비
 canvas.addEventListener("click", () => {
     canvas.focus();
 });
 
+// 첫 화면 HUD 표시
 updateHUD();
 
 </script>
